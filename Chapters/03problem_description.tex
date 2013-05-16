@@ -7,10 +7,16 @@ Building a slow crawler that runs on one machine and downloads several pages per
 \lhead{Chapter 3. \emph{Problem description}} % Change X to a consecutive number; this is for the header on each page - perhaps a shortened title
 
 \section{Size of the web}
-Today (Thursday, 09 May, 2013) the size of the world wide web is at least 14.78 billion (10\textsuperscript{9}) pages.\cite{wwwsize}
+Today (Thursday, 09 May, 2013) the size of the world wide web is at least 14.78 billion (10\textsuperscript{9}) indexed pages.\cite{wwwsize}
 
-\section{Parallelization policy}
+Here is a simple calculation to demonstrate how long it takes to download the entire web if you fetch one page after the other.
+Lets assume an average page size of \textbf{320KB} \cite{webmetrics} (including resources such as images, scripts and stylesheets) and an ideal network connection of \textbf{100mbit/s}.
 
+Based on these numbers it would take \textbf{~11.7 years}. And it becomes worse when you add a realistic latency of 100msec per page which adds another \textbf{~47 years} of idletime. So, in total it takes \textbf{58.7 years}.
+
+As you can see, if you want to do download the web in a reasonable amout of time we have to \textbf{split} the work and \textbf{distribute} the parts so that we can do it in \textbf{parallel}.
+
+\section{Split the work}
 \subsection{Work splitting}
 \subsection{Load balancing}
 
