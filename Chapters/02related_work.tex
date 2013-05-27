@@ -15,6 +15,15 @@ One page is downloaded at the time. Nothing happens in parallel. Theses kind of 
 \section{Parallel crawlers}
 \section{Centralized crawlers}
 \section{Decentralized crawlers}
+Decentralized crawlers do not have a central managing units. Typically those systems have identifiable and equal workers which are responsible for a certain piece of the work. Such a system is fully distributed and easily scalable (increase the number of workers). Of course there is some sort of communication between the workers (that could be seen as central), but the important point is that each worker is equal and autonomic.
 
 \subsection{UbiCrawler: a scalable fully distributed Web crawler \cite{ubicrawler}}
+They have multiple identically implemented (Java) workers (called agents). Every worker has an identity and is responsible for a defined set of URL's. For a given URL every worker is able to compute the identity responsible for that URL locally. This reduces the intercommunication overhead between the different workers in the system. The component used to compute a workers identity (based on a URL) is called \textbf{assignment function}. It is important to note here, that the function directly assigns an identity of a worker. To be more precise, a worker that is alive and healthy. This fact of direct assignment leads to a problem they need to solve. What happens if the assigned worker crashes? In this case it must be guaranteed that the function reassigns the same worker after he is back alive. (For a rapidly changing total set of URL's). So they need an assignment function that is:
+\begin{itemize}
+\item Random (to properly load balance the system)
+\item Local (Problem of joining/leaving workers)
+\item Contravariant (adding new workers, shrinks the workload (set of URL's) of one worker. )
+\end{itemize}
+Satisfying two of those requirements (Random, Contravariant) is easily achievable with a simple modulo function on the hash of the URL for example. The information every worker must know at anytime is the total number of workers in the system. Satisfying the third one is more complex and they solved it using a modified version of \textbf{consistent hashing} called \textbf{Identifier–Seeded Consistent Hashing}. 
 
+Crawl.js will try to circumvent this complexity by adding an additional layer between the assignment function and the responsible worker. In Crawl.js the assignment function doesn't assign an identity of a worker but an identity of a bucket. A bucket is nothing more than a persistent queue. So the assignment function doesn't know anything about workers. In a second step Crawl.js will assign workers to those buckets. Using this additional layer removes complexity to the assignment function while keeping fault tolerance capabilities. This is achieved by flagging processed URL's within the bucket.
