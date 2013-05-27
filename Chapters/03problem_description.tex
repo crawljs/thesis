@@ -14,13 +14,36 @@ Lets assume an average page size of \textbf{320KB} \cite{webmetrics} (including 
 
 Based on these numbers it would take \textbf{~11.7 years}. And it becomes worse when you add a realistic latency of 100msec per page which adds another \textbf{~47 years} of idletime. So, in total it takes \textbf{58.7 years}.
 
-As you can see, if you want to do download the web in a reasonable amout of time we have to \textbf{split} the work and \textbf{distribute} the parts so that we can do it in \textbf{parallel}.
+As you can see, if you want to do download the web in a reasonable amout of time we have to \textbf{split} and \textbf{distribute} the work so that we can do it in \textbf{parallel}.
 
-\section{Split the work}
-\subsection{Work splitting}
-\subsection{Load balancing}
+\section{Parallel work}
+Lets discuss the challenges in splitting and distributing the work.
+\subsection{Split}
+How do we split the huge amount of work equally? We need pieces of work that we can distribute to different workers. The pieces should be:
+\begin{itemize}
+\item Mutual exclusive (we dont want to download pages twice)
+\item Equally sized.
+\item Clustered in terms of \textbf{closeness}.
+\end{itemize}
+Additionally we have another challenge. The total amount of work is growing and therefore we need to be able to adjust the splitting dynamically. If one piece becomes too big we need to be able to split it further.
+\subsection{Distribute}
+Once we have splitted the work we can distribute the smaller work pieces to different workers. This has to be done in such a way that every piece of work is assigned to one worker only. Additionally we want that the work load of all workers is more or less the same. This leads us to another problem we have to work on: \textbf{Load-balancing}.
+\subsection{Load-balance}
+What worker should work on which work piece next? so that:
+\begin{itemize}
+\item Every worker is busy.
+\item No worker is idleing.
+\item The worker is working on a piece best suited for him. (\textbf{Performance})
+\end{itemize}
+The balancer should recognise workers taking too long to do one piece of work and be able take appropriate actions.
 
-\section{Synchronization}
+\section{Performance}
+The reason why we \textbf{split} and \textbf{distribute} the work is performance. We want to minimalize the time to download all pages. Doing it in parallel is not everything, we need to tackle a lot more challenges. The number of optimizations one could think of is probably infinite. Here are the major challenges we want to solve.
 \subsection{Closeness}
-\subsection{Politeness}
-
+In order to optimize a particular worker, the worker should be \textbf{close} in terms of:
+\begin{itemize}
+\item Latency
+\item Geo Location
+\end{itemize}
+\subsection{Decentralized}
+We don't want a \textbf{central} bottleneck unit. Every component in the system should be intelligent and able to decide what to do next on his own.
