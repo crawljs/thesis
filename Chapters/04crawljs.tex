@@ -5,9 +5,16 @@ In this chapter we describe how crawl.js splits and distributes the work in deta
 \lhead{Chapter 4. \emph{Crawl.js}} 
 
 \section{System overview}
-As stated in the title of this thesis, Crawl.js is a decentralized crawler. So there are no different components that depend on each other to fulfill a certain task. There are different components in the system like the \emph{Storage} and the \emph{Worker} but one worker is standalone and autonomous. A worker does not depend on any other worker in the system. The only thing a worker needs is a connection to the Storage layer. Where it gets his work from.
-Each worker then works on a defined set of URLs called a \emph{URL-Block} and regulary checks the storage to update his progress.
+Crawl.js is a decentralized system. Each \emph{worker} in the system is standalone and autonomous and does not depend on any other worker. The only thing a worker needs is a connection to the \emph{Queues} and the \emph{Stores}. Figure~\ref{system_overview} gives an overview of the main components in the system.
 
+\begin{figure}[h]
+\centering
+  \includegraphics[width=1\textwidth]{Figures/system_overview.pdf}
+\caption{Crawl.js - System Overview}
+\label{system_overview}
+\end{figure}
+
+\subsection{dQueue (A distributed Queue)}
 \subsection{URL-Block}
 A URL-Block is nothing more than a set of URLs or to be more precise a queue of URLs. It is obvious that at some point we will need some ordering within the set of URLs.
 This queue or URL-Block is the entity used to distribute the work. There is always only one consumer (worker) per URL-Block.
@@ -25,17 +32,17 @@ One worker for one URL-Block. This is true for consuming URLs but obviously we h
 The storage has two main roles in the system. The first is the classic, well-known role of making the downloaded content persistent (html, images, css). The second role of the storage is to provide a persistence layer for the URL-Blocks (queues) described earlier.
 There are distinct requirements for the two roles of the storage that we will present later.
 
-\section{URL-Block (Queue)}
-\subsection{Requirements}
+\section{dQueues (distributed Queues)}
+\subsection{URL-Block (a single Queue)}
 \subsection{Implementation (Redis.io)}
 
-\section{Sponge}
-\subsection{Requirements}
+\section{Storage}
 \subsection{Implementation (Riak)}
 
 \section{Mapper}
-\subsection{Static assignment}
-\subsection{Dynamic assignment}
+\subsection{Requirements}
+\subsection{Static mapping}
+\subsection{Dynamic mapping}
 \subsection{Load-Balancing}
 
 \section{Worker (a crawl.js instance)}
