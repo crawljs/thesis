@@ -17,8 +17,32 @@ The first thing a worker needs to do is get some URLs (1) from a remote queue (N
 \label{system_overview}
 \end{figure}
 
+\section{Mapper}
+The mapper is not a physical component in the system like the \emph{Queue}, the \emph{Worker} or the \emph{Store}. It is a algorithm allowing each component at any time to map an URL to an identifier. This identifier is then primarily used to determine the responsible \emph{Queue} or \emph{Store} for that URL.
+This ability of being able to compute an identifier for a URL \emph{independently} is key to the whole system architecture. This ability is what makes the system decentralized. We don't have to ask a central component with manager like capabilities. We can compute the identifier ourself. Basically it identifies a virtual block within the URL space (all URLs). Every URL belongs to one and only one virtual block and each block is:
+\begin{itemize}
+  \item Mutual exclusive - Each block belongs to one and one worker only.
+  \item Equally sized - From block to block the number of URLs should roughly be the same.
+
+In other words the mapper is responsible to \emph{split} the work. In Crawl.js the mapper is nothing more than a function implemented as a separate module. Each component that needs to be able to map an URL to an identifier just include the module. The algorithm used is rather simple and illustrated below:
+
+function map (url)
+  host = url.host
+  return hash(host) MOD total number of blocks
+
+So the idea is to hash the host part of the URL modulo the total number of blocks we want. The modulo number (total number of blocks) must be shared among every component using the mapper in the system.
+To achieve this shared knowledge we can use a \emph{static} or a \emph{dynamic} approach. Using the static one is much simpler and achievable through simple configuration values. The key about the \emph{static} approach is that the number doesn't change during runtime. If we want to change the configuration, we have to shutdown all workers, reconfigure them and restart. Using the \emph{dynamic} approach would allow us to change the value while all workers continue to run. They would simply start mapping URLs to new identifiers as soon as we change the value. It is obvious that for the dynamic approach some sort of communication between the mappers is needed to interchange the newly assigned value of "total number of virtual url blocks".
+
+TODO: Dynamic approach
+
+\subsection{Politeness}
+To start, what does it mean for a crawler to be polite. There are different aspects of politeness like the robots exclusion protocol (discussed in \ref{worker}) that we don't want to discuss here. We want to discuss how often a crawler should access a server within a time frame. It is not especially the number (once a second ex.) that is important but the fact that we need to be able to limit/control this number.
+
+In order to do that we hash only the host part of the URL in our mapping function. Doing so guarantees that there is always only one worker responsible for one host. Having this situation allows us now to control this aspect of politeness.
+During our first test runs we accidentally hashed the whole URL. This resulted in an uncontrollable situation because multiple workers were fetching the same host simultaneously.
+
 \section{Queues}
-Queues play a central role in the Crawl.js system. There are \emph{local} queues (in-memory) and \emph{remote} queues. At any time each worker is able to identify the responsible queue for a given URL without any communication to other components in the system. This feature is what makes the system decentralized and is discussed in a seperate section (\emph{Dispatcher}) in detail.
+Queues play a central role in the Crawl.js system. There are \emph{local} queues (in-memory) and \emph{remote} queues. At any time each worker is able to identify the responsible queue for a given URL without any communication to other components in the system. This feature is what makes the system decentralized and is discussed in a separate section (\emph{Mapper}) in detail.
 
 \subsection{Queue}
 First a few words about how we use the word \emph{Queue} within this document. Strictly and technically speaking it is \emph{more} than a queue. A basic queue has the following operations:
@@ -27,16 +51,24 @@ First a few words about how we use the word \emph{Queue} within this document. S
   \item dequeue
 \end{itemize}
 
-New items are enqueued at the bottom of the list and existing items are dequeued from the top. In terms of URLs this could work. But, what if we want to prioritize the URLs in the queue in some way. Of course we could enqueue URLs in the order we want them prioritiezed but this is rather inconvinient and does not work for existing URLs in the queue. We want to be able to re-prioritize (remove/change) existing URLs in the queue. And as mentioned in \cite{hp_crawler} fetching URLs in the order they were enqueued is a bad idea because of second-level locality in the links.
+New items are enqueued at the bottom of the list and existing items are dequeued from the top. In terms of URLs this could work. But, what if we want to prioritize the URLs in the queue in some way. Of course we could enqueue URLs in the order we want them prioritized but this is rather inconvenient and does not work for existing URLs in the queue. We want to be able to re-prioritize (remove/change) existing URLs in the queue. And as mentioned in \cite{hp_crawler} fetching URLs in the order they were enqueued is a bad idea because of second-level locality in the links.
 
 Therefore in Crawl.js a queue is a \emph{sorted set}. With sorted sets we can achieve whatever order we like. We can simulate a queue with it (thats why we still call it queue), use a pure random approach (set) or use custom algorithms to compute the order in the queues (re-visit policies).
 
 \subsection{Local Queue (in-memory)}
-As the title describes it, from the worker's point of view it is a local and in-memory queue.
+As the title describes it, from the worker's point of view it is a local and in-memory queue. The reason why every worker has a local queue is twofold:
+\begin{itemize}
+  \item We want the worker to be autonomous for a certain time. Therefore he needs a place to put the newly found URLs (during his crawl).
+  \item Additionally we don't want to fetch the same URL twice (during one crawl of one worker). Therefore the local queue is the first filter used to eliminate duplicated URLs. Because the Queue is implemented as a sorted set, checking for the existence of an URL is easy an achievable in the complexity of O(1).
+\end{itemize}
+
+One thing to note is that the state of this local queue is in memory only. This means that when the worker crashes this state is lost. So we need to find a trade off between autonomy and fault tolerance. We want the worker to be autonomous (no inter communication) as much as possible, but on the other side we don't want to loose to much information if a worker crashes. Currently this trade off is adjustable with the help of a configuration value that limits the queue in size. Once this limit is reached, the worker does not put any new URLs in the local queue but dispatches them to the \emph{remote} one. This allows him to empty his queue and finish his crawl. An additional idea would be to limit a crawl in terms of time, but this is not implemented yet.
 
 \subsection{Remote Queue (Redis.io)}
 
 \subsection{Dispatcher}
+This component is responsible to \emph{distribute} the work
+
 
 \subsection{URL-Block}
 A URL-Block is nothing more than a set of URLs or to be more precise a queue of URLs. It is obvious that at some point we will need some ordering within the set of URLs.
@@ -48,6 +80,7 @@ Ola store
 \subsection{Implementation (Riak)}
 
 \section{Worker (a crawl.js instance)}
+\label{worker}
 A worker is autonomous and responsible for one URL-Block. Why autonomous? Because a worker can fetch pages, store them and extract new URLs out of it. Newly found URLs are assigned (\emph{Mapper}) to their URL-Block and dispatched automatically. All this happens without any interaction to other components in the system. This keeps the number of inter-communication messages very low.
 
 One worker for one URL-Block. This is true for consuming URLs but obviously we have multiple URL producers. Namely each worker in the system is a candidate for producing new URLs because each one is able to assign and dispatch newly found URLs independly. So we have one consumer and multiple producers whithin one URL-Block (queue).
