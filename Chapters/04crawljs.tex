@@ -23,12 +23,17 @@ This ability of being able to compute an identifier for a URL \emph{independentl
 \begin{itemize}
   \item Mutual exclusive - Each block belongs to one and one worker only.
   \item Equally sized - From block to block the number of URLs should roughly be the same.
+\end{itemize}
 
 In other words the mapper is responsible to \emph{split} the work. In Crawl.js the mapper is nothing more than a function implemented as a separate module. Each component that needs to be able to map an URL to an identifier just include the module. The algorithm used is rather simple and illustrated below:
-
-function map (url)
-  host = url.host
-  return hash(host) MOD total number of blocks
+\begin{algorithmic}[0]
+\Function{Map}{$url$}\Comment{The url}
+\State $host \gets url.host$\Comment{The host part of the url}
+\State $hash \gets \textbf{hash}(url)$\Comment{Hash the host part}
+\State $id \gets hash \bmod n$\Comment{limit answer between 0 and number of virtual blocks}
+\State \textbf{return} $id$
+\EndFunction
+\end{algorithmic}
 
 So the idea is to hash the host part of the URL modulo the total number of blocks we want. The modulo number (total number of blocks) must be shared among every component using the mapper in the system.
 To achieve this shared knowledge we can use a \emph{static} or a \emph{dynamic} approach. Using the static one is much simpler and achievable through simple configuration values. The key about the \emph{static} approach is that the number doesn't change during runtime. If we want to change the configuration, we have to shutdown all workers, reconfigure them and restart. Using the \emph{dynamic} approach would allow us to change the value while all workers continue to run. They would simply start mapping URLs to new identifiers as soon as we change the value. It is obvious that for the dynamic approach some sort of communication between the mappers is needed to interchange the newly assigned value of "total number of virtual url blocks".
