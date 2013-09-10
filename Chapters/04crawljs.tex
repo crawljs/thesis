@@ -93,17 +93,42 @@ This is maybe not the best approach of how to prioritize URLs within the remote 
 \subsection{Memory usage (Redis.io)}
 
 \section{Stores}
-Ola store
-\subsection{Implementation (Riak)}
+Besides \emph{Queues} there is another important component in the system. \emph{Stores}. While queues persist the system state, stores persist the downloaded content (html, css, js, ..). The worker is able to identify his store using the \ref{mapper} module.
+\subsection{Consuming \& Producing}
+In this component we do not have \emph{consumers}, We have \emph{producers} only and because a worker is producing to his store only, there is no multiple producer situation for a single \emph{store}.
 
-\section{Worker (a crawl.js instance)}
+\subsection{Store}
+The \emph{store} is here to persist the downloaded data of one worker. The API towards a store looks like this:
+\begin{itemize}
+  \item PUT (URL, DATA, [timestamp])
+\end{itemize}
+This abstraction gives us the ability to implement different store engines and encapsulate implementation details (batch-processing) in a modular way. Like the sorted sets in the queues, the store gives us the flexiblity to do whatever we want with the downloaded data. In Crawl.js we have implemented different store engines:
+\begin{itemize}
+  \item Riak, Cassandra - NoSql
+  \item Fs - Local Filesystem
+  \item Dummy - Does nothing
+\end{itemize}
+
+\section{Worker (a Crawl.js instance)}
 \label{worker}
-A worker is autonomous and responsible for one URL-Block. Why autonomous? Because a worker can fetch pages, store them and extract new URLs out of it. Newly found URLs are assigned (\emph{Mapper}) to their URL-Block and dispatched automatically. All this happens without any interaction to other components in the system. This keeps the number of inter-communication messages very low.
+While Crawl.js is the whole system composed of different components (queue, store, worker) working together, a Crawl.js instance is a single worker. This worker is implemented in JavaScript and runs on Node.js\footnote{Node.js - \url{http://nodejs.org}}.
+In this section we will talk about the Software Architecture and discuss some implementation details.
 
-One worker for one URL-Block. This is true for consuming URLs but obviously we have multiple URL producers. Namely each worker in the system is a candidate for producing new URLs because each one is able to assign and dispatch newly found URLs independly. So we have one consumer and multiple producers whithin one URL-Block (queue).
-\subsection{States}
-Dummy
-\subsection{Software Architecture}
+\section{Node.js}
+What we really wanted is native support for non blocking IO because crawling webpages involves a lot of IO. We don't want to block while waiting for a response to be completely available (headers, body). We want to fire requests and be notified (called back) when thre is some data available. And while we are idleing we have time to do other things (parsing). In Node.js everything is done through events (callbacks). An event is a function that gets executed with a defined context. It starts with the initial start script and ends when there are no more callbacks to be executed. This event model fits very well and allowed us to implement the crawler in a elegant way. We didn't need to struggle with multiple Threads and possible dead locks to achieve concurrency. Below are some example events we will encouter throughout the code.
+
+\begin{itemize}
+  \item on 'URL': fetch page
+  \item on 'chunk': extract <a> tags, ..
+  \item on 'chunk': store it, batch process it, ..
+  \item emit 'URL': from extraced <a> tags
+  \item ...
+\end{itemize}
+
+As you can see the event model even allows us to stream data (No need to wait until everything is downloaded). As soon as we get some response data we can start to do things. Note the plural.
+
+\subsection{Source}
+
 Dummy
 \subsection{Configuration}
 Dummy
@@ -114,4 +139,5 @@ Dummy
 \subsection{Storage}
 Dummy
 \subsection{Details - (Url-normalization, ..)}
+A lot ...
 
