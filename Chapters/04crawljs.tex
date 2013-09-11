@@ -90,8 +90,6 @@ In Crawl.js remote queues are implemented with Redis\footnote{Redis - \url{http:
 
 This is maybe not the best approach of how to prioritize URLs within the remote queues, but it is was simple to implement and allowed us to run first tests. The important thing to note here is that we have set a base with sorted sets that allows us to easily try out new approaches. As an example we could introduce an independent component in the system that takes care of computing the order of our queues based on some algorithms. (ex. Page rank).
 
-\subsection{Memory usage (Redis.io)}
-
 \section{Stores}
 Besides \emph{Queues} there is another important component in the system. \emph{Stores}. While queues persist the system state, stores persist the downloaded content (html, css, js, ..). The worker is able to identify his store using the \ref{mapper} module.
 \subsection{Consuming \& Producing}
@@ -114,30 +112,230 @@ This abstraction gives us the ability to implement different store engines and e
 While Crawl.js is the whole system composed of different components (queue, store, worker) working together, a Crawl.js instance is a single worker. This worker is implemented in JavaScript and runs on Node.js\footnote{Node.js - \url{http://nodejs.org}}.
 In this section we will talk about the Software Architecture and discuss some implementation details.
 
-\section{Node.js}
+\subsection{Node.js}
 What we really wanted is native support for non blocking IO because crawling webpages involves a lot of IO. We don't want to block while waiting for a response to be completely available (headers, body). We want to fire requests and be notified (called back) when thre is some data available. And while we are idleing we have time to do other things (parsing). In Node.js everything is done through events (callbacks). An event is a function that gets executed with a defined context. It starts with the initial start script and ends when there are no more callbacks to be executed. This event model fits very well and allowed us to implement the crawler in a elegant way. We didn't need to struggle with multiple Threads and possible dead locks to achieve concurrency. Below are some example events we will encouter throughout the code.
 
 \begin{itemize}
-  \item on 'URL': fetch page
+  \item on 'url': fetch page
   \item on 'chunk': extract <a> tags, ..
   \item on 'chunk': store it, batch process it, ..
-  \item emit 'URL': from extraced <a> tags
+  \item emit 'url': from extraced <a> tags
   \item ...
 \end{itemize}
 
 As you can see the event model even allows us to stream data (No need to wait until everything is downloaded). As soon as we get some response data we can start to do things. Note the plural.
 
-\subsection{Source}
+\subsection{Directory Layout}
+As mentioned above Crawl.js is written in JavaScript. In this section we will start with a directory layout to get an overview of the code. Afterwards we will explain the most important code snippets more in detail and follow to the various events throughout the application.
+\\
+\dirtree{%
+  .1 /crawl.js\DTcomment{Project root}.
+  .2 benchmarks\DTcomment{Some benchmarks (parsing, resolving links)}.
+  .2 config.json\DTcomment{Configuration file}.
+  .2 crawl.js\DTcomment{Application entry point}.
+  .2 lib.
+  .3 config.js\DTcomment{Utility to load/cache config files}.
+  .3 dispatcher.js.
+  .3 extractor.js\DTcomment{Extractor interface}.
+  .3 extractors.
+  .4 parser.js\DTcomment{Extractor using a SAX like parser}.
+  .4 regex.js\DTcomment{Extractor using regular expressions}.
+  .3 fetcher.js\DTcomment{Concurrent request/response handling}.
+  .3 logger.js\DTcomment{Simple stdout logging}.
+  .3 queue.js\DTcomment{Queue interface}.
+  .3 queues.
+  .4 memory.js\DTcomment{in-memory implementation (local queue)}.
+  .4 redis.js\DTcomment{Implementation using redis (remote queue)}.
+  .3 queues.js\DTcomment{Access queues easily}.
+  .3 robo.js\DTcomment{Robots exclusion protocol with caching capabilities}.
+  .3 store.js\DTcomment{Store interface}.
+  .3 stores.
+  .4 cassandra.js\DTcomment{Cassandra implementation}.
+  .4 fs.js\DTcomment{Local filesystem implementation}.
+  .4 \ldots.
+  .3 url.js\DTcomment{URL Mapper (virtual-block) and utilities}.
+  .2 node\_modules\DTcomment{Node.js dependencies (3rd party libraries)}.
+  .2 package.json\DTcomment{npm configuration https://npmjs.org/doc/json.html}.
+  .2 tools.
+  .3 importer.js\DTcomment{Import some initial URLs into the queues}.
+}
 
-Dummy
-\subsection{Configuration}
-Dummy
-\subsection{github}
-Dummy
-\subsection{Performance}
-Dummy
-\subsection{Storage}
-Dummy
-\subsection{Details - (Url-normalization, ..)}
-A lot ...
+\subsection{Application (crawl.js)}
+Lets start with the entry point. To run a worker we need to provide one argument. The id of the virtual URL block (url-block). A worker needs to know for which block he is responsible for. The range of the available url-blocks is configurable in \emph{config.json}.
 
+\begin{lstlisting}[language=sh]
+$ node crawl.js <url-block>
+\end{lstlisting}
+
+The first function executed is \emph{init}.
+
+\begin{lstlisting}[language=JavaScript]
+function init(block) {
+
+  conf.block = parseInt(block, 10); //virtual url-block passed as argument on startup
+  queues.local().on('url', crawl); //establish event flow
+  fetcher.init();
+
+  peek(); //get urls from remote queue
+
+}
+\end{lstlisting}
+
+First, we populate (Line 3) the virtual url block we are responsible to the whole application and establish the event flow. After that we peek (without removing them) some URLs from the remote queue and as soon as we get some URLs back the 'url' event is fired which causes the crawl to start. Also later during the crawl, whenever a new URL is found (ex. parsing) it is the same event that gets fired over and over. So lets examine the function \emph{crawl} that gets triggered by the 'url' event (Line 4).
+
+\begin{lstlisting}[language=JavaScript]
+function crawl() {
+
+  if (fetcher.isBusy()) {
+    //max number of concurrent connections reached.
+    return;
+  }
+
+  var queue = queues.local()
+    , url = queue.dequeue();
+
+  if (!url) {
+    if (!fetcher.isActive()) {
+      if (quitting) {
+        quit();
+      } else {
+        log.info('job done! waiting to restart.');
+        setTimeout(peek, 5000);
+      }
+    }
+    //other crawlers still running. they will trigger more events
+    return;
+  }
+
+  fetcher.get(url, function (err) {
+    if (err) {
+      log.error('fetch went wrong: %s', err);
+    }
+    printQueue();
+    process.nextTick(crawl);
+  });
+
+}
+\end{lstlisting}
+
+To be able to crawl a page we need the \emph{Fetcher} in the first place. So if he is busy we do nothing. Busy means that the fetcher has reached the configured value (config.json) of concurrent connections.
+Lets assume the fetcher is not busy and we have an URL in our queue. In that case, we are going to crawl our first page. The URL is dequeued and passed to the fetcher (Line 24). Together with the URL we pass our callback function to continue the event flow. This is a typical example of the asychronous programming style in Node.js. The passed function (callback) is called as soon as the fetcher is done. That means we return immediately from the \emph{crawl} function and while the fetcher establishes the connection to our URL and begins to download the content we do not waste CPU resources. 
+
+Lets take a closer look to the passed callback function in Line 24. There is one argument: \emph{err}. It is a convetion in Node.js that the first argument of a asynchronous callback function is always the error. Even if there is none. We will encounter this programming style through out the code but now lets focus on what gets done when our callback is executed. In case of an error we log it and for debugging reasons we print out our local queue. But the most important thing happens on Line 29. Here the event loop of Node.js is presented to us as a language construct. It looks like a recursive call of \emph{crawl} but in fact we tell the event loop (behind the scenes, vm) to include the callback \emph{crawl} in his execution loop. Doing so makes sure that our worker never terminates.
+
+\subsection{Fetcher (fetcher.js)}
+Next thing to look at is the fetcher. We mentioned before that we are able to process multiple concurrent connections without multiple threads. So how is this actually achieved and how does the event flow continue after we get some data back.
+Lets start with the most important function \emph{get}. Note that this is a class function.
+
+\begin{lstlisting}[language=JavaScript]
+Fetcher.get = function (url, cb) {
+  if (Fetcher.isBusy()) {
+    return cb(new Error('Fetcher is busy'));
+  }
+  Fetcher.active++;
+  Fetcher.instances[Fetcher.next++].get(url, function () {
+    Fetcher.active--;
+    cb.apply(this, arguments);
+  });
+  if (Fetcher.next >= Fetcher.instances.length) {
+    Fetcher.next = 0;
+  }
+};
+\end{lstlisting}
+
+What this function does is assigning the job of getting the URL to an instance [Line 6]. As you can see there are multiple instances and the selection is done in a circular fassion (round-robin). Actually this is how we achieve multiple concurrent connections with a single thread. Because assigning one of the instances is done asynchronously (providing a callback Line 6) we can immediately return out of the function. The assigned instance establishes the connection (discussed later) which involves a lot of waiting and because in Node.js nothing blocks during this time \emph{get} can be executed again. (Assigning another instance). Once all instances are assigned we end up in a busy fetcher. In this situation we have reached our max. number of concurrent connections which is equal to the number of instances (configurable in config.json).
+
+Because our class function \emph{get} does only assign jobs to fetcher instances, lets have a look at a code snippet of an instance.
+
+\begin{lstlisting}[language=JavaScript]
+Fetcher.prototype.get = function (url, cb){
+  ...
+  //happens before any 'data' event
+  req.on('response', function (resp) {
+
+    var options = resp.headers || {}
+      , ct = resp.headers['content-type'] || '';
+
+    self.extractor.setBaseUrl(self._url);//the URL we are currently fetching
+
+    //parse only content-type text/* with statusCode 200
+    if (resp.statusCode === 200 && (ct.indexOf('text/') >= 0 || ct === '')) {
+      req.pipe(self.extractor, {end: false});
+    }
+    ...
+  });
+};
+\end{lstlisting}
+
+We intentionally left out the details of setting up the request (timeout, max. redirects, ..) because we want to focus on those lines. It is where the event flow continues. That is to say we \emph{pipe} our Readable stream \footnote{\url{http://nodejs.org/api/stream.html}}, the request, into our \emph{extractor} (discussed later). The concept of a pipeline is nothing new and a very powerful tool in the Unix world. "A set of processes chained by their standard streams, so that the output of each process (stdout) feeds directly as input (stdin) to the next one"\cite{wiki:pipeline_unix}. Our first element in the pipe (the request) feeds the extractor with multiple \emph{data} events. The fact that we can emit those events as soon as we receive them from the network (chunks) is very handy because the extractor can start extracting links while we are waiting for more \emph{data}. This event based IO (asynchronous) is what makes Node.js so performant while remaining relatively easy to use.
+
+Lets have a look at the consumer.
+
+\subsection{Extractor (extractor.js)}
+This component is responsible for extracting new URLs out of the downloaded document (html). The newly found URLs are passed to the \emph{dispatcher} who's goal is to filter out URLs based on various rules (see dispatcher). As we mentioned above we pipe \emph{data} events into the extractor, so obviously the extractor has to be a writable stream\footnote{\url{http://nodejs.org/api/stream.html}}. Additionally we have implemented the extractor in such a way that the actual work of extracting the URLs is done by an engine. Currently there are two implementations available:
+\begin{itemize}
+  \item Regex - Extractor engine based on regular expressions
+  \item Parser - Extractor engine based on a SAX like parser
+\end{itemize}
+Additional engines can be added easily and which one to use is configured in config.json. Lets have a look at the consumer side of our pipe, the function \emph{\_write} a writable stream must implement.
+
+\begin{lstlisting}[language=JavaScript]
+Parser.prototype._write = function(chunk, enc, cb) {
+  this.parser.write(chunk);
+  cb();
+};
+\end{lstlisting}
+
+It does nothing but forward the data to the parser and signal (Line 3) the first element in the pipe (the request) that we successfully handled the data. During the parsing we call the function \emph{Extractor.prototype.found(urlObj)} whenever we find an URL we are interested in (ex. <a> tags). See below the very simple implementation of it.
+
+\begin{lstlisting}[language=JavaScript]
+Extractor.prototype.found = function (urlObj) {
+  this.dispatcher.dispatch(urlObj);
+};
+\end{lstlisting}
+
+\subsection{Dispatcher (dispatcher.js)}
+Actually we do not only dispatch URLs. We discard unwanted URLs and normalize the accepted ones. The topic of efficient URL normalization\cite{wiki:url_normalization} is very complex and our approach does not respect any aspects of this research area at all. The implemented strategy is way too simple and may be revised in future versions of crawl.js.
+
+After normalizing the accepted URL we dispatch it the following way:
+
+\begin{lstlisting}[language=JavaScript]
+Dispatcher.prototype.dispatch = function(urlObj) {
+  ...
+    var entry = url.normalize(urlObj)
+    , block = url.block(urlObj.hostname); //mapper
+
+    if (block === conf.block && !Dispatcher.blocked) {
+      if (!self.localQueue.enqueue(entry)) {
+        //once the queue limit is reached, we want to empty it completely
+        Dispatcher.block(true);
+        self.remoteQueue.enqueue(entry);
+      }
+    } else {
+      self.remoteQueue.enqueue(entry, block);
+    }
+  });
+};
+\end{lstlisting}
+
+If the identifier of the URL (Mapper [\ref{mapper}]) matches the virtual URL \emph{block} we are responsible for we enqueue the URL to our local queue. Otherwise the URL is enqueued to the right remote queue (Line 14). As you can see at Line 4, we use only the host name as input for the mapper. Additionally we stop to enqueue to the local queue as soon as it is full(limit configurable in config.json). This configurable limit allows us to tweak the trade-off between fault tolerance and autonomy as mentioned in section \ref{queues_local}. Setting a low value (ex. 100) makes the worker end after a short period of time and re ask the remote queue for new URLs (less autonomous). Respectively, a large value makes the crawl more autonomous.
+
+\subsection{Queue (queue.js)}
+We started the crawl by asking the \emph{remote} queue for URLs and we end it when there are no URLs left in the \emph{local} queue. Queues are key components to crawl.js and a good and performant implementation of them is very important. Our current approach is to have two queues: a \emph{local} and a \emph{remote} one. They are easily accessible through the helper module \emph{queues.js}. But both implement (parts of it) the queue interface we defined in \emph{queue.js}. To keep things identical, queue implementations are also called \emph{engines}. Currently we have two engines available:
+\begin{itemize}
+  \item Memory - volatile implementation using an array
+  \item Redis - implemented using a redis server as backend
+\end{itemize}
+Which queue engine to use is configurable in \emph{config.json}. This setup (using engines) allows us to add new queue implementations easily. As an example lets consider the following idea for a remote queue using redis: 2 sets, one for newly found URLs, one for URLs we have successfully downloaded. We could easily implement:
+\begin{itemize}
+  \item enqueue - add to the set of new URLs (redis sadd\footnote{\url{http://redis.io/commands\#set}})
+  \item dequeue - add to the set of downloaded URLs (redis sadd)
+  \item peek - substract set of downloaded URLs from set of new URLs (sdiff)
+\end{itemize}
+This idea could easily be implemented as a seperate engine (ex. redis-two-sets.js).
+
+\subsection{Configuration (config.json)}
+We referenced the ability of various configurable parameters of a worker. You find an example in ~\nameref{appendix:config.json}. The keys are pretty self explaining.
+
+\subsection{Repository}
+Our project is available at github - \url{https://github.com/cederigo/crawl.js} - any contributions are very welcome.

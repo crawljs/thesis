@@ -1,9 +1,52 @@
 % Appendix A
 
-\chapter{Appendix Title Here} % Main appendix title
+\chapter{Configuration - config.json} % Main appendix title
 
-\label{AppendixA} % For referencing this appendix elsewhere, use \ref{AppendixA}
+\label{appendix:config.json} % For referencing this appendix elsewhere, use \ref{AppendixA}
 
-\lhead{Appendix A. \emph{Appendix Title Here}} % This is for the header on each page - perhaps a shortened title
+\lhead{Appendix A. \emph{Configuration - config.json}} % This is for the header on each page - perhaps a shortened title
 
-Write your Appendix content here.
+Example configuration file (config.json) in JSON.\cite{wiki:json}
+
+\begin{lstlisting}[language=JavaScript]
+{
+   "fetcher": {
+    "instances": 5,
+    "request": {
+        "jar": true,
+        "timeout": 30000,
+        "followRedirect": true,
+        "maxRedirects": 3,
+        "headers": {
+          "User-Agent": "crawl.js v0.0.1"
+        }
+    }
+  },
+  "extractor": "parser",
+  "queues": {
+    "local": {
+      "type": "memory",
+      "options": {
+        "limit": 1000
+      }
+    },
+    "remote": {
+      "type": "redis",
+      "options": {
+        "batchSize": 20,
+        "host": "127.0.0.1",
+        "port": "6379"
+      }
+    }
+  },
+  "store": {
+    "type": "dummy"
+  },
+  "url": {
+    "blocks": 16
+  },
+  "robo": {
+    "limit": 100
+  }
+}
+\end{lstlisting}
