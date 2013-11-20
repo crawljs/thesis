@@ -40,6 +40,7 @@ The balancer should recognise workers taking too long to do one piece of work an
 \section{Performance}
 The reason why we \textbf{split} and \textbf{distribute} the work is performance. We want to minimalize the time to download all pages. Doing it in parallel is not everything, we need to tackle a lot more challenges. The number of optimizations one could think of is probably infinite. Here are the major challenges we want to solve.
 \subsection{Closeness}
+\label{closeness}
 In order to optimize a particular worker, the worker should be \textbf{close} in terms of:
 \begin{itemize}
 \item Latency
