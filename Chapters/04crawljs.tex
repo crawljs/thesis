@@ -303,7 +303,7 @@ After normalizing the accepted URL we dispatch it the following way:
 Dispatcher.prototype.dispatch = function(urlObj) {
   ...
     var entry = url.normalize(urlObj)
-    , block = url.block(urlObj.hostname); //mapper
+    , block = url.block(entry); //mapper
 
     if (block === conf.block && !Dispatcher.blocked) {
       if (!self.localQueue.enqueue(entry)) {
