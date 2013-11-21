@@ -68,8 +68,43 @@ The worker VM hosts our developed crawler (crawl.js instance). Setting it up was
 \section{Experiment 1 (basic properties, scaling)}
 This experiment was about verifying the basic properties of crawl.js as discussed in section~\ref{Chapter5}. Figure~\ref{exp_001} shows our first results.
 
-\begin{tikzpicture} \begin{axis}
-    \addplot+[sharp plot] coordinates
-        {(0,0) (1,2) (2,3)};
-\end{axis}
+\begin{tikzpicture} 
+  \begin{axis}[
+    ybar,
+    bar width=12pt,
+    bar shift=-8pt,
+    axis y line*=left,
+    enlargelimits=0.2,
+    xlabel={workers},
+    xlabel near ticks,
+    ylabel={minutes},
+    ylabel near ticks,
+    xtick=data,
+    symbolic x coords={1,2,4},
+    legend style={at={(1.4,1)}, anchor=north west, draw=none},
+    nodes near coords,
+    nodes near coords align={vertical},
+    ]
+    \addplot[fill=black]
+      coordinates {(1,13.5) (2,7.3) (4,4.0)};
+    \legend{Duration}
+  \end{axis}
+  \begin{axis}[
+    ybar,
+    bar width=12pt,
+    bar shift=8pt,
+    axis y line*=right,
+    hide x axis,
+    enlargelimits=0.2,
+    ylabel={Pages / second},
+    ylabel near ticks,
+    symbolic x coords={1,2,4},
+    legend style={at={(1.4,0.9)},anchor=north west, draw=none},
+    nodes near coords,
+    nodes near coords align={vertical},
+    ]
+    \addplot[fill=yellow]
+      coordinates {(1,263) (2,485) (4,892)};
+  \legend{Performance}
+  \end{axis}
 \end{tikzpicture}
