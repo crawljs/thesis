@@ -138,6 +138,7 @@
 \usepackage{listings}
 \usepackage{color}
 \usepackage[utf8]{inputenc}
+\usepackage{array}
 
 \lstset{captionpos=b,
         frame=,

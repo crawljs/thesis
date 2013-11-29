@@ -11,12 +11,6 @@ After discussing how crawl.js works we want to run some experiments. We decided 
 First we describe our \emph{setup} and afterwards we discuss the different experiments we ran on it. \emph{Experiment 1} focuses on verifying basic properties of crawl.js (e.g. scaling). In \emph{Experiment 2 \& 3} we introduce latency and compare two different \emph{mapper}~\ref{mapper} approaches. A simple (random,hash) URL to worker assignment and a 2-level assignment.
 
 
-%Furthermore we want to verify the \emph{closeness}~\ref{closeness} aspect of crawl.js. Crawl.js is configurable in such a way that sites that are \emph{close} (in terms of latency) to a worker are assigned to them. In order to do that we will add virtual latency to some of the sites and compare two different mapper~\ref{mapper} implementations:
-%\begin{itemize}
-%\item Simple - the whole URL is hashed. Therefore the site to worker assignment is random.
-%\item 2-level - the host part of the URL identifies the group of workers. (a group that is \emph{close}). The remaining part of the URL determines the worker inside the group.
-%\end{itemize}
-
 \section{Setup}
 To do our experiments we had to setup the following types of VM in the cluster:
 \begin{itemize}
@@ -24,6 +18,7 @@ To do our experiments we had to setup the following types of VM in the cluster:
 \item redis - remote queues.
 \item workers - crawls pages from \emph{www} and updates remote queues in \emph{redis}.
 \end{itemize}
+All VM's are based on a ubuntu server 12.04.3 LTS (64bit) image.
 
 To setup and manage (workers) the VMs efficiently we wrote some basic bash scripts. It allowed us to deploy different worker configurations easily and perform basic operations on the workers such as start and stop. Having those scripts saved us a lot of time throughout the different experiments we ran. You find all scripts used throughout our experiments in the crawl.js git repository. In Figure~\ref{test_setup} is an overview of all the VMs used during the experiments.
 
@@ -66,58 +61,10 @@ The worker VM hosts our developed crawler (crawl.js instance). Setting it up was
 The goal of our first experiment was to verify the following basic properties of crawl.js.
 
 \begin{itemize}
-\item The crawl stops
-\item Adding more workers reduces the crawl duration (1, 2 \& 4 workers)
-\item All pages are found (starting with a single seed URL)
+  \item The crawl stops
+  \item Adding more workers reduces the crawl duration (1, 2 \& 4 workers)
+  \item All pages are found (starting with a single seed URL)
 \end{itemize}
-
- All tests (1, 2 and 4 workers) started with the same seed URL (http://bn.wikipedia.org) and as shown in Figure~\ref{plot:exp_001} the first results verified both properties: \emph{The crawl stops} and \emph{Adding more workers reduces the crawl duration}. The scaling behaviour actually exceeded our expectations as it was almost linear. The communication overhead needed to perform a crawl with more than 1 worker was minimal. A possible explanation for this overhead is worker idle times. Because every worker flushes the newly found URLs only once every 10 seconds (configurable), other workers could ran out of work and be forced to wait (and re ask later). Verifying this assumption would require an additional experiment. Basically exactly the same experiment but starting with many seed URLs (those found during this experiment for example). We are pretty sure that with a big seed list idling would not happen or at least be shorter.
-\newline
-\newline
-For the last property \emph{All pages are found} wikipedia provides a downloadable text file containing all article URLs. Using this file we were able to import the expected URLs into redis (set datastructure). Afterwards we took the difference (redis diff) between the two sets 'urls:expected' and 'urls:crawled'. Unfortunately the resulting set was not empty. It had 23'338 URLs. That number seemed us pretty huge, thats about 16\% of all articles. Did we miss that many URLs? We decided to have a closer look at some randomly picked articles to check what we actually missed. We discovered quickly that most of these 'missed' articles redirected (alias) to other articles we did crawl (13'391 redirect articles). Because articles never reference articles through an alias, crawl.js did not discover those 'redirect-articles' (as we follow references,<a> tags). This still leaves us with 9'947 (7\%) of potentially missed articles. Again we randomly picked some of the remaining articles and discovered that none of them were referenced by other articles (using grep -r). Of course we did not check for references to all remaining articles but 7\% of orphaned articles~\footnote{\url{http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Orphanage}} seemed us realistic and therefore the verification of this property good enough to proceed with our experiments.
-\newline
-\newline
-\begin{tikzpicture} 
-  \begin{axis}[
-    ybar,
-    bar width=12pt,
-    bar shift=-8pt,
-    axis y line*=left,
-    enlargelimits=0.2,
-    xlabel={workers},
-    xlabel near ticks,
-    ylabel={minutes},
-    ylabel near ticks,
-    xtick=data,
-    symbolic x coords={1,2,4},
-    legend style={at={(1.4,1)}, anchor=north west, draw=none},
-    nodes near coords,
-    nodes near coords align={vertical},
-    ]
-    \addplot[fill=black]
-      coordinates {(1,13.5) (2,7.3) (4,4.0)};
-    \legend{Duration}
-  \end{axis}
-  \begin{axis}[
-    ybar,
-    bar width=12pt,
-    bar shift=8pt,
-    axis y line*=right,
-    hide x axis,
-    enlargelimits=0.2,
-    ylabel={Pages / second},
-    ylabel near ticks,
-    symbolic x coords={1,2,4},
-    legend style={at={(1.4,0.9)},anchor=north west, draw=none},
-    nodes near coords,
-    nodes near coords align={vertical},
-    ]
-    \addplot[fill=yellow]
-      coordinates {(1,263) (2,485) (4,892)};
-  \legend{Performance}
-  \end{axis}
-\label{plot:exp_001}
-\end{tikzpicture}
 
 \subsection{Configuration}
 
@@ -125,10 +72,128 @@ Here is an overview of the configuration we used.
 
 \begin{itemize}
   \item Mapper: simple (random URL to worker assignment)
+  \item Workers: 1, 2 \& 4
   \item Sites: http://bn.wikipedia.org, http://bs.wikipedia.org (142'082 articles)
   \item Site latencies: None
 \end{itemize}
 
+\subsection{Analysis}
+
+ All tests (1, 2 and 4 workers) started with the same seed URL (http://bn.wikipedia.org) and as shown in Figure~\ref{plot:exp_001} the first results verified both properties: \emph{The crawl stops} and \emph{Adding more workers reduces the crawl duration}. The scaling behaviour actually exceeded our expectations as it was almost linear. The communication overhead needed to perform a crawl with more than 1 worker was minimal. A possible explanation for this overhead is worker idle times. Because every worker flushes the newly found URLs only once every 10 seconds (configurable), other workers could ran out of work and be forced to wait (and re ask later). Verifying this assumption would require an additional experiment. Basically exactly the same experiment but starting with many seed URLs (those found during this experiment for example). We are pretty sure that with a big seed list idling would not happen or at least be shorter.
+\newline
+\newline
+For the last property \emph{All pages are found} wikipedia provides a downloadable text file containing all article URLs. Using this file we were able to import the expected URLs into redis (set datastructure). Afterwards we took the difference (redis diff) between the two sets 'urls:expected' and 'urls:crawled'. Unfortunately the resulting set was not empty. It had 23'338 URLs. That number seemed us pretty huge, thats about 16\% of all articles. Did we miss that many URLs? We decided to have a closer look at some randomly picked articles to check what we actually missed. We discovered quickly that most of these 'missed' articles redirected (alias) to other articles we did crawl (13'391 redirect articles). Because articles never reference articles through an alias, crawl.js did not discover those 'redirect-articles' (as we follow references,<a> tags). This still leaves us with 9'947 (7\%) of potentially missed articles. Again we randomly picked some of the remaining articles and discovered that none of them were referenced by other articles (using grep -r). Of course we did not check for references to all remaining articles but 7\% of orphaned articles~\footnote{\url{http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Orphanage}} seemed us realistic and therefore the verification of this property good enough to proceed with our experiments.
+\newline
+\newline
+\begin{figure}
+\centering
+  \begin{tikzpicture} 
+    \begin{axis}[
+      ybar,
+      bar width=12pt,
+      enlargelimits=0.2,
+      axis y line*=left,
+      xlabel={Workers},
+      xlabel near ticks,
+      ylabel={Minutes},
+      ylabel near ticks,
+      xtick=data,
+      nodes near coords,
+      nodes near coords align={vertical},
+      ]
+      \addplot
+        coordinates {(1,13.78) (2,7.47) (4,4.07)};
+    \end{axis}
+  \end{tikzpicture}
+\caption{Scaling behaviour (1,2 \& 4 workers)}
+\label{plot:exp_001}
+\end{figure}
+
 \section{Experiment 2}
 
+In this experiment we took the same setup as in experiment 1 (4 workers). Additionally we implemented an additional feature for crawl.js. A 2-level mapper. The goal of this experiment was to show that the new 2-level mapper performs as good and to introduce \emph{closeness}. By adding 50ms (100ms) of latency to bs.wikipedia.org we demonstrate how important it is for a worker to be \emph{close}. Or better, how bad it is to be \emph{far}. In experiment 3 we will reconfigure the system in order to obtain a shorter crawl duration with the same latencies used during this experiment.
+
+\subsection{2-level Mapper (Groups of workers)}
+This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms of latency) should be crawled by workers near them. 
+\newline
+As the name suggests it, the URL to worker assignment is done using 2 levels. The first level (e.g. hostname) determines the group and the second level (e.g. path + query part) identifies the worker within that group. The 2-level mapper introduces the notion of groups to crawl.js and adds an additional dimension to the configuration. Previously we had 1 dimension: url-blocks. Now we have 2: groups \& blocks within that group. Note that each group can be configured independently. 1 group may have 1 worker and another 3 (e.g. depending on the number of URLs a group is responsible for).
+\newline
+With groups we have now the ability to configure crawl.js in such a way that \emph{closeness} is respected. For example we can create a group \emph{switzerland} responsible for crawling the top-level domain \emph{ch}. How different group configurations affects the total crawl duration will be shown in experiment 3.
+\newline
+In this experiment we used one group with 4 blocks to be as close to the configuration used in experiment 1.
+
+\subsection{Configuration}
+\begin{itemize}
+  \item Mapper: 2-level
+  \item Groups: 0: 4 blocks
+  \item Workers: 4
+  \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
+  \item Latency: none, 50ms \& 100ms on bs.wikipedia.org
+\end{itemize}
+
+\subsection{Analysis}
+Exactly as in experiment 1 all tests (0ms, 50ms, 100ms) started with a single seed URL. http://bn.wikipedia.org. With no latency we can see in Figure~\ref{plot:exp_002} that the novel 2-level mapper performs as good as the simple mapper (4m06s vs. 4m04s). The observed difference to experiment 1 is probably due to the cluster being more or less busy during our experiments. We repeated the test and measured 4m05s which enforces our assumption.
+\\
+Regarding the latency we can see in Figure~\ref{plot:exp_002} that the crawl performance suffers drastically. In our simple setup the theoretical explanation for the measured values is straight forward (Figure~\ref{eq:exp_002}). When using the following values:
+\begin{itemize}
+  \item $n_{dt}:$ 130'966 (includes: 404, 500 etc.)
+  \item $n:$ 217'690 
+  \item $c:$ 40 ( 4 workers with 10 concurrent connections each)
+  \item $dt:$ 50ms (100ms)
+\end{itemize}
+
+We get a delay (D) of approximately 4.5 minutes (9 minutes) for a latency of 50ms (100ms). These calculations are pretty good in line with the measured values.
+
+\begin{figure}
+  \centering
+  \[ D = \frac{n_{dt} dt}{\frac{c n_{dt}}{n}} \]
+  \begin{tabular}{@{}>{$}l<{$}l@{}}
+    n_{dt} & Number of pages with latency\\
+    dt & latency\\
+    n & Total number of pages \\
+    c & Concurrent connections\\
+  \end{tabular}
+\caption{Equation: Total crawl delay (D)}
+\label{eq:exp_002}
+\end{figure}
+
+\begin{figure}
+\centering
+  \begin{tikzpicture} 
+    \begin{axis}[
+      ybar,
+      bar width=12pt,
+      axis y line*=left,
+      enlargelimits=0.2,
+      xlabel={Latency [ms]},
+      xlabel near ticks,
+      ylabel={Minutes},
+      ylabel near ticks,
+      xtick=data,
+      nodes near coords,
+      nodes near coords align={vertical},
+      ]
+      \addplot
+        coordinates {(0,4.1) (50,7.4) (100,13.22)};
+    \end{axis}
+  \end{tikzpicture}
+\caption{Crawl durations (4 workers) with different latencies}
+\label{plot:exp_002}
+\end{figure}
+
 \section{Experiment 3}
+
+In the previous experiment we showed that latency on sites affects the crawl performance heavily. In this experiment we want to demonstrate that crawl.js is able to deal with different latencies on different sites. We want to show that when using the exact same latency configurations (100ms) as in experiment 2 we are able to achieve better performances by reconfiguring crawl.js. We will keep the number of workers the same but we will re-group them differently in order to respect \emph{closeness}.
+
+\subsection{Configuration}
+Test one exactly reflects the same setup as in experiment 2. 1 group with 4 workers and 100ms latency on bs.wikipedia.org. We repeat it just to confirm the measured results in experiment 2 and to prepare for the remaining tests. Because there is only one group and the URL to worker assignment is done randomly every worker is affected by the latency. In order to achieve a better performance we need workers that are not affected by the latency. Therefore we introduce a second group (Test 2 \& 3). One group will be responsible for bs.wikipedia.org (100ms latency) and the other group for bn.wikipedia.org (no latency). With this setup we will be able to have workers that can operate on sites without (or with less) latency. We will do 2 different tests with 2 groups. First we will keep the groups equally powerful by assigning 2 workers to each of them, second we will rebalance the groups and move 1 worker to the group responsible for the site with latency. This way we will have one group with a single worker responsible for bn.wikipedia.org (no latency) and another group with 3 workers responsible for bs.wikipedia.org (100ms latency). You can see the measured crawl durations in Figure~\ref{plot:exp_003}.
+\begin{itemize}
+  \item Mapper: 2-level
+  \item Workers: 4
+  \item Groups: G0: 4 blocks, G0: 2 blocks \& G1: 2 blocks, G0: 1 block \& G1: 3 blocks
+  \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
+  \item Latency: 100ms on bs.wikipedia.org
+\end{itemize}
+
+\subsection{Analysis}
+
