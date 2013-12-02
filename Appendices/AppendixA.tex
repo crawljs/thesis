@@ -1,17 +1,28 @@
 % Appendix A
 
-\chapter{Configuration - config.json} % Main appendix title
-
+\chapter{Configuration - config.json - Experiment 3} % Main appendix title
 \label{appendix:config.json} % For referencing this appendix elsewhere, use \ref{AppendixA}
+\lhead{Appendix A. \emph{Configuration - config.json - Experiment 3}} % This is for the header on each page - perhaps a shortened title
 
-\lhead{Appendix A. \emph{Configuration - config.json}} % This is for the header on each page - perhaps a shortened title
-
-Example configuration file (config.json) in JSON.\cite{wiki:json}
-
+Here you find the configuration as used during Experiment 3. More precisely test 3 of experiment 3. It uses a total of 4 workers (10 connections each) assigned to 2 groups. Group 0 having 1 worker and group 1 with 3 workers.
+\newline
+The format is in JSON.\cite{wiki:json}
 \begin{lstlisting}[language=JavaScript]
 {
-   "fetcher": {
-    "instances": 5,
+  "group": "the group we are crawling for. defined by argv[1]",
+  "block": "the block we are crawling for. defined by argv[2]",
+  "mapper": {
+    "rules": [
+      {"hostname": "bs.wikipedia.org", "group": 0 },
+      {"hostname": "bn.wikipedia.org", "group": 1 }
+    ],
+    "groups": [
+      {"group": 0, "blocks": 1},
+      {"group": 1, "blocks": 3}
+    ]
+  },
+  "fetcher": {
+    "instances": 10,
     "request": {
         "jar": true,
         "timeout": 30000,
@@ -27,23 +38,28 @@ Example configuration file (config.json) in JSON.\cite{wiki:json}
     "local": {
       "type": "memory",
       "options": {
-        "limit": 1000
+        "limit": 10000
       }
     },
     "remote": {
       "type": "redis",
       "options": {
-        "batchSize": 20,
-        "host": "127.0.0.1",
+        "flushInterval": 10000,
+        "host": "redis0",
         "port": "6379"
       }
     }
   },
-  "store": {
-    "type": "dummy"
+  "seen": {
+    "host": "redis0",
+    "port": "6379"
   },
-  "url": {
-    "blocks": 16
+  "dispatcher": {
+    "acceptPattern": "http://(bs|bn).wikipedia.org/articles"
+  },
+  "store": {
+    "type": "dummy",
+    "options": {}
   },
   "robo": {
     "limit": 100
