@@ -39,13 +39,14 @@ In other words the mapper is responsible to \emph{split} the work. In Crawl.js t
 So the idea is to hash the host part of the URL modulo the total number of blocks we want. The modulo number (total number of blocks) must be shared among every component using the mapper in the system.
 To achieve this shared knowledge we can use a \emph{static} or a \emph{dynamic} approach. Using the static one is much simpler and achievable through simple configuration values. The key about the \emph{static} approach is that the number doesn't change during runtime. If we want to change the configuration, we have to shutdown all workers, reconfigure them and restart. Using the \emph{dynamic} approach would allow us to change the value while all workers continue to run. They would simply start mapping URLs to new identifiers as soon as we change the value. It is obvious that for the dynamic approach some sort of communication between the mappers is needed to interchange the newly assigned value of "total number of virtual url blocks".
 
-TODO: Dynamic approach
-
 \subsection{Politeness}
 To start, what does it mean for a crawler to be polite. There are different aspects of politeness like the robots exclusion protocol (discussed in \ref{worker}) that we don't want to discuss here. We want to discuss how often a crawler should access a server within a time frame. It is not especially the number (ex. once every 30 seconds) that is important but the fact that we need to be able to limit/control this number.
 
 In order to do that we hash only the host part of the URL in our mapping function. Doing so guarantees that there is always only one worker responsible for one host. Having this situation allows us now to control this aspect of politeness.
 During our first test runs we accidentally hashed the whole URL. This resulted in an uncontrollable situation because multiple workers were fetching the same host simultaneously.
+
+\subsection{Alternatives}
+The introduced mapper function here is rather simplistic. Throughout the theoretical sections of this thesis we will reference the here described mapper implementation. But in section~\ref{section:experiments} we implement an alternative mapper and make use of it. It introduces the notion of groups to crawl.js and makes the configuration of crawl.js much more powerful. Important to note is that implementing a novel mapper approach is done easily and with more experiments even more mappers can be evaluated.
 
 \section{Queues}
 Queues play a central role in the Crawl.js system. There are \emph{local} queues and \emph{remote} queues. Each worker keeps a local, in-memory queue during his crawl for various reasons discussed in section \ref{queues_local} and each worker \emph{consumes} URLs from a remote queue. A remote queue represents one virtual URL block (as discussed in section \ref{mapper}). But, before we start with the details we state more precisely the term queue used in Crawl.js.
@@ -135,13 +136,14 @@ As mentioned above Crawl.js is written in JavaScript. In this section we will st
   .2 crawl.js\DTcomment{Application entry point}.
   .2 lib.
   .3 config.js\DTcomment{Utility to load/cache config files}.
-  .3 dispatcher.js.
+  .3 dispatcher.js.\DTcomment{Dispatch/discard found URLs}
   .3 extractor.js\DTcomment{Extractor interface}.
   .3 extractors.
   .4 parser.js\DTcomment{Extractor using a SAX like parser}.
   .4 regex.js\DTcomment{Extractor using regular expressions}.
   .3 fetcher.js\DTcomment{Concurrent request/response handling}.
   .3 logger.js\DTcomment{Simple stdout logging}.
+  .3 mapper.js\DTcomment{Maps URLs to blocks (\& groups)}.
   .3 queue.js\DTcomment{Queue interface}.
   .3 queues.
   .4 memory.js\DTcomment{in-memory implementation (local queue)}.
@@ -153,7 +155,7 @@ As mentioned above Crawl.js is written in JavaScript. In this section we will st
   .4 cassandra.js\DTcomment{Cassandra implementation}.
   .4 fs.js\DTcomment{Local filesystem implementation}.
   .4 \ldots.
-  .3 url.js\DTcomment{URL Mapper (virtual-block) and utilities}.
+  .3 url.js\DTcomment{URL utilities}.
   .2 node\_modules\DTcomment{Node.js dependencies (3rd party libraries)}.
   .2 package.json\DTcomment{npm configuration https://npmjs.org/doc/json.html}.
   .2 tools.
@@ -335,7 +337,7 @@ Which queue engine to use is configurable in \emph{config.json}. This setup (usi
 This idea could easily be implemented as a seperate engine (ex. redis-two-sets.js).
 
 \subsection{Configuration (config.json)}
-We referenced the ability of various configurable parameters of a worker. You find an example in ~\nameref{appendix:config.json}. The keys are pretty self explaining.
+We referenced the ability of various configurable parameters of a worker. You find the configuration of experiment 3 in ~\nameref{appendix:config.json}. The keys are pretty self explaining.
 
 \subsection{Repository}
 Our project is available at github - \url{https://github.com/cederigo/crawl.js} - any contributions are very welcome.
