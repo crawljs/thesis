@@ -150,6 +150,7 @@ As mentioned above Crawl.js is written in JavaScript. In this section we will st
   .4 redis.js\DTcomment{Implementation using redis (remote queue)}.
   .3 queues.js\DTcomment{Access queues easily}.
   .3 robo.js\DTcomment{Robots exclusion protocol with caching capabilities}.
+  .3 seen.js\DTcomment{Set to keep track of seen URLs}.
   .3 store.js\DTcomment{Store interface}.
   .3 stores.
   .4 cassandra.js\DTcomment{Cassandra implementation}.
@@ -304,23 +305,36 @@ After normalizing the accepted URL we dispatch it the following way:
 \begin{lstlisting}[language=JavaScript]
 Dispatcher.prototype.dispatch = function(urlObj) {
   ...
-    var entry = url.normalize(urlObj)
-    , block = url.block(entry); //mapper
-
-    if (block === conf.block && !Dispatcher.blocked) {
+  var entry = url.normalize(urlObj)
+    , block;
+  
+  if (!self.seen.isMember(entry)) {
+    self.seen.add(entry);
+    block = self.mapper.block(urlObj);
+  
+    if (self._forUs(block) && !Dispatcher.blocked) {
       if (!self.localQueue.enqueue(entry)) {
-        //once the queue limit is reached, we want to empty it completely
         Dispatcher.block(true);
-        self.remoteQueue.enqueue(entry);
-      }
-    } else {
-      self.remoteQueue.enqueue(entry, block);
+      }                                                                                                                                
     }
-  });
+    //to keep local & remote queue in sync
+    self.remoteQueue.enqueue(entry, block);
+  }
 };
 \end{lstlisting}
 
-If the identifier of the URL (Mapper [\ref{mapper}]) matches the virtual URL \emph{block} we are responsible for we enqueue the URL to our local queue. Otherwise the URL is enqueued to the right remote queue (Line 14). As you can see at Line 4, we use only the host name as input for the mapper. Additionally we stop to enqueue to the local queue as soon as it is full(limit configurable in config.json). This configurable limit allows us to tweak the trade-off between fault tolerance and autonomy as mentioned in section \ref{queues_local}. Setting a low value (ex. 100) makes the worker end after a short period of time and re ask the remote queue for new URLs (less autonomous). Respectively, a large value makes the crawl more autonomous.
+If the identifier of the URL (Mapper [\ref{mapper}]) matches the virtual URL \emph{block} we are responsible for we enqueue the URL to our local queue. Additionally we enqueue it remotely in order to keep the local and remote queues in sync. We do this to survive worker crashes. If it happens we can restart - syncing our local queue with the remote one - and continue where we left. Additionally we stop to enqueue to the local queue as soon as it is full (limit configurable in config.json). This configurable limit allows us to tweak the trade-off between fault tolerance and autonomy as mentioned in section \ref{queues_local}. Setting a low value (ex. 100) makes the worker end after a short period of time and re ask the remote queue for new URLs (less autonomous). Respectively, a large value makes the crawl more autonomous.
+
+\subsection{Seen (seen.js)}
+In the last snippet an important module was not discussed. The seen module. It is pretty simple in terms of functions it provides:
+\begin{itemize}
+  \item isMember (entry) - check `entry` for existence
+  \item add (entry) - mark `entry` as seen
+\end{itemize}
+But still very important for a worker and his autonomy. Designing and implementing a high performance seen module, able to deal with billions of entries is a complex topic and can not be done in memory only for obvious reasons \cite{hp_crawler}. In crawl.js we do not have to deal with a seen module capable of such properties. Because Crawl.js is decentralized, the seen module is too. And as such the number of entries we have to deal with is much smaller (1-10 Millions). Basically it is equal to the size of the URL block we are responsible for. Of course keeping URL blocks reasonably small is left to the configuration but in our implementation we assumed that it is the case.
+\newline
+\newline
+Therefore our seen module is backed by a JavaScript Object - which is a set - and is in memory only. This allows us to test an URL for existence locally and therefore very efficiently O(1). Additionally the seen module is initialized with the URL entries found in the remote queue (only the downloaded ones). With this, the memory state can be re-initialized after a worker crash for example. 
 
 \subsection{Queue (queue.js)}
 We started the crawl by asking the \emph{remote} queue for URLs and we end it when there are no URLs left in the \emph{local} queue. Queues are key components to crawl.js and a good and performant implementation of them is very important. Our current approach is to have two queues: a \emph{local} and a \emph{remote} one. They are easily accessible through the helper module \emph{queues.js}. But both implement (parts of it) the queue interface we defined in \emph{queue.js}. To keep things identical, queue implementations are also called \emph{engines}. Currently we have two engines available:
