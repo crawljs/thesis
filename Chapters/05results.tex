@@ -186,14 +186,42 @@ We get a delay (D) of approximately 4.5 minutes (9 minutes) for a latency of 50m
 In the previous experiment we showed that latency on sites affects the crawl performance heavily. In this experiment we want to demonstrate that crawl.js is able to deal with different latencies on different sites. We want to show that when using the exact same latency configurations (100ms) as in experiment 2 we are able to achieve better performances by reconfiguring crawl.js. We will keep the number of workers the same but we will re-group them differently in order to respect \emph{closeness}.
 
 \subsection{Configuration}
-Test one exactly reflects the same setup as in experiment 2. 1 group with 4 workers and 100ms latency on bs.wikipedia.org. We repeat it just to confirm the measured results in experiment 2 and to prepare for the remaining tests. Because there is only one group and the URL to worker assignment is done randomly every worker is affected by the latency. In order to achieve a better performance we need workers that are not affected by the latency. Therefore we introduce a second group (Test 2 \& 3). One group will be responsible for bs.wikipedia.org (100ms latency) and the other group for bn.wikipedia.org (no latency). With this setup we will be able to have workers that can operate on sites without (or with less) latency. We will do 2 different tests with 2 groups. First we will keep the groups equally powerful by assigning 2 workers to each of them, second we will rebalance the groups and move 1 worker to the group responsible for the site with latency. This way we will have one group with a single worker responsible for bn.wikipedia.org (no latency) and another group with 3 workers responsible for bs.wikipedia.org (100ms latency). You can see the measured crawl durations in Figure~\ref{plot:exp_003}.
+Test one exactly reflects the same setup as in experiment 2. 1 group with 4 workers and 100ms latency on bs.wikipedia.org. We repeat it just to confirm the measured results in experiment 2 and to prepare for the remaining tests. Because there is only one group and the URL to worker assignment is done randomly every worker is affected by the latency. In order to achieve a better performance we need workers that are not affected by the latency. Therefore we introduce a second group (Test 2 \& 3). One group is responsible for bs.wikipedia.org (100ms latency) and the other one for bn.wikipedia.org (no latency). With this setup we are be able to have workers that can operate on sites without (or with less) latency. We do 2 different tests with those 2 groups. First we keep the groups equally powerful by assigning 2 workers to each of them, second we rebalance the groups by moving 1 worker to the other group. This way we will have one group with a single worker responsible for bn.wikipedia.org (no latency) and another group with 3 workers responsible for bs.wikipedia.org (100ms latency). You can see the measured crawl durations in Figure~\ref{plot:exp_003}.
 \begin{itemize}
   \item Mapper: 2-level
   \item Workers: 4
-  \item Groups: G0: 4 blocks, G0: 2 blocks \& G1: 2 blocks, G0: 1 block \& G1: 3 blocks
+  \item Groups:
+    \begin{itemize}
+      \item Config 0: 1 group with 4 blocks
+      \item Config 1: 2 groups with 2 blocks each
+      \item Config 2: 1 group with 1 block, 1 group with 3 blocks
+    \end{itemize}
   \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
   \item Latency: 100ms on bs.wikipedia.org
 \end{itemize}
 
 \subsection{Analysis}
 
+\begin{figure}
+\centering
+  \begin{tikzpicture} 
+    \begin{axis}[
+      ybar,
+      bar width=12pt,
+      axis y line*=left,
+      enlargelimits=0.2,
+      xlabel={Group Configurations},
+      xlabel near ticks,
+      ylabel={Minutes},
+      ylabel near ticks,
+      xtick=data,
+      nodes near coords,
+      nodes near coords align={vertical},
+      ]
+      \addplot
+        coordinates {(0,13.2) (1,0) (2,0)};
+    \end{axis}
+  \end{tikzpicture}
+\caption{Crawl performance using different group configurations}
+\label{plot:exp_003}
+\end{figure}
