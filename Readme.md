@@ -2,5 +2,6 @@
 To be used with a LaTex distribution such as TeX Live or MacTex.
 
 ```
-make
+$ make
+$ make clean
 ```
