@@ -1,13 +1,32 @@
 % Chapter Template
 
 \chapter{Conclusions and future work} % Main chapter title
-
 \label{Chapter6} % Change X to a consecutive number; for referencing this chapter elsewhere, use \ref{ChapterX}
-
 \lhead{Chapter 6. \emph{Conclusions and future work}} % Change X to a consecutive number; this is for the header on each page - perhaps a shortened title
 
+TODO
 
-\section{Performance}
-\section{Url normalization}
-\section{Re-visit policy}
+\section{Future work}
+Here are some ideas how crawl.js could evolve in the future. They came across during our work and could not be implemented mostly because of time/focus constraints. The order is purely random and has nothing to do with our preference.
 
+\subsection{Dynamic configuration}
+In crawl.js the configuration is done statically. We define the number of groups (and the number of blocks within them) in a file \emph{before} we start the crawler. In our simple experiment setup this was good enough. But the need to this during \emph{runtime} is obvious. Especially when crawling the public internet (or part of) the number of workers needed (to finish in a reasonable time) is not known in advance. Neither how to distribute them to the different groups, or how many groups are needed at all. Therefore a configuration/monitoring channel is really needed. Through this communication channel the workers would \emph{announce} them self and request a valid configuration to start crawling. Of course new configurations could be pushed during runtime too. Additionally monitoring functionalities could go through this channel too which leads us to the next section. 
+
+\subsection{Administration}
+Making sure that all workers (and other components) are alive and healthy is a need that becomes more and more important as the number of components within the system grows. As an administrator of the system we need to \emph{monitor} the components and have some sort of an interface to take appropriate \emph{actions}.
+
+\subsection{Blacklist}
+The management of a global blacklist is just an example of an important administration task. When crawling the public internet we need to be able to react to the following example situations:
+\begin{itemize}
+  \item Rescue workers from spider traps \cite{wiki:spider_trap}.
+  \item React to complaints about our crawler.
+\end{itemize}
+
+\subsection{Public crawl}
+We did mention that crawling the public internet would be the next step to really test crawl.js. In order to do that a good supervision is essential. Especially handling complaints quickly in order not to ruin the reputation of crawl.js. When designing and implementing a crawler errors such as crawling a site too often are inevitable and therefore a good administration is essential. Therefore we suggest to implement an administration interface \emph{before} doing a significantly big public crawl.
+
+\subsection{URL normalization}
+The topic of URL normalization \cite{wiki:url_normalization} was absolutely not respected during our implementation. Future versions of crawl.js should consider implementing at least the discussed approaches in RFC3986 \cite{rfc:url_normalization}.
+
+\subsection{Page importance}
+Page importance and related graph problems have not been taken into account. The order at which Crawl.js fetches pages is random. While the topic of page importance is complex it could be implemented easily in crawl.js, mainly because crawl.js uses distributed (sorted-) sets to manage URLs. With this data structure a PageRank\cite{google} could be computed off-line and the resulting sorted set used by the workers. Or maybe a novel on-line algorithm such as OPIC (On-line Page Importance Computation) \cite{page_importance1} could be implemented as well.
