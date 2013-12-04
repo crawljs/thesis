@@ -10,12 +10,14 @@ Crawl.js is not ready to be let out into the wild. Far from it. It misses many f
 With this in mind we are pretty satisfied with the experiences we gained throughout our work and with the final results we achieved. The node.js (JavaScript) environment proved itself to be a perfect fit for the implementation of Crawl.js. Because of its event-driven model we could keep our code clean and simple. Not only did we never struggle with concurrency-/deadlock situations but the purely asynchronous nature of it granted other advantages:
 \begin{itemize}
 \item Resource capacity. By tuning the number of concurrent connections we achieved to operate at full capacity (\~ 90\% CPU) easily.
-\item Good performance (~ 250 pages / second \& worker\ref{appendix_worker}), especially when taking into account that we parse the downloaded pages too.
+\item Good performance. Around 250 pages/second per worker. Especially when taking into account that we parse the downloaded pages too. You find details about the hardware used for one worker in Appendix~\ref{appendix:worker}.
 \item Integration with redis is a breeze.
 \end{itemize}
 Working with redis and using its data structures to manage our queues was another great decision we made. The set (sorted-set) structures gave us all the atomic operations we needed and performed very good in our simple experiments. Of course a cluster must be set up as the number of URLs grows to share the key space among multiple servers but for crawl.js nothing changes if using a cluster or a single server. Furthermore is the ability of distributing the key space to different servers (data-centers) a feature that the crawl.js system highly values. Remember we wanted an architecture deployable to different (small) data centers.
 \newline
-With the help of the set (sorted-set) structures we could also easily introduce groups (and blocks within them) in order to respect \emph{closeness} to the pages we fetch. Groups and blocks are nothing more than (set-)keys of the following form: 'group:X:block:Y'. And last but not least were the main redis commands used in crawl.js capable of handling multiple values at once. Therefore does crawl.js communicate efficiently by sending URLs in batches.
+With the help of the set (sorted-set) structures we could also easily introduce groups of workers in order to respect \emph{closeness} to the pages we fetch. Groups (and blocks) are nothing more than (set-)keys of the following form: 'group:XX:block:YY'. And because the redis commands used to manipulate the sets (sorted-sets) are mostly able to deal with multiple values (members) at once, we were able to implement a simple batch processing of URLs very easily. This made the communication between the workers and redis very efficient.
+\newline
+Last but not least we achieved an almost linear scaling behaviour, which in our eyes is a pretty good foundation to build upon.
 
 \section{Future work}
 Here are some ideas how crawl.js could evolve in the future. They came across during our work and could not be implemented mostly because of time/focus constraints. The order is purely random and has nothing to do with our preference.

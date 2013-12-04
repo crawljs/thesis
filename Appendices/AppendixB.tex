@@ -1,0 +1,57 @@
+% Appendix A
+
+\chapter{Worker hardware details (lshw)} % Main appendix title
+\label{appendix:worker} % For referencing this appendix elsewhere, use \ref{AppendixA}
+\lhead{Appendix A. \emph{Worker hardware details}} % This is for the header on each page - perhaps a shortened title
+
+Thats the output (stripped down) of the command \emph{lshw} from one of our VMs used throughout the experiments. With such hardware we achieved around 250 pages / second.
+\newline
+\begin{lstlisting}[language=Bash]
+sudo lshw -c cpu -c memory -c network
+  *-cpu
+       description: CPU
+       product: QEMU Virtual CPU version 1.0
+       vendor: Intel Corp.
+       physical id: 401
+       bus info: cpu@0
+       slot: CPU 1
+       size: 2GHz
+       capacity: 2GHz
+       width: 64 bits
+  *-memory
+       description: System Memory
+       physical id: 1000
+       size: 1GiB
+       capacity: 1GiB
+     *-bank
+          description: DIMM RAM
+          physical id: 0
+          slot: DIMM 0
+          size: 1GiB
+          width: 64 bits
+  *-network
+       description: Ethernet interface
+       product: RTL-8139/8139C/8139C+
+       vendor: Realtek Semiconductor Co., Ltd.
+       physical id: 3
+       bus info: pci@0000:00:03.0
+       logical name: eth0
+       version: 20
+       serial: 02:00:c0:a8:62:09
+       size: 100Mbit/s
+       capacity: 100Mbit/s
+       width: 32 bits
+       clock: 33MHz
+  *-memory
+       description: RAM memory
+       product: Virtio memory balloon
+       vendor: Red Hat, Inc
+       physical id: 4
+       bus info: pci@0000:00:04.0
+       version: 00
+       width: 32 bits
+       clock: 33MHz (30.3ns)
+       capabilities: bus_master
+       configuration: driver=virtio-pci latency=0
+       resources: irq:11 ioport:c120(size=32)
+\end{lstlisting}
