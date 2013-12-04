@@ -4,7 +4,18 @@
 \label{Chapter6} % Change X to a consecutive number; for referencing this chapter elsewhere, use \ref{ChapterX}
 \lhead{Chapter 6. \emph{Conclusions and future work}} % Change X to a consecutive number; this is for the header on each page - perhaps a shortened title
 
-TODO
+Crawl.js is not ready to be let out into the wild. Far from it. It misses many features a mature crawler should have which we discuss partially in the \emph{future work} section. But the focus of Crawl.js was notably to design a distributed crawling architecture able to download sites in parallel. An architecture that allows us to crawl (read fetch) sites efficiently and is able to scale easily as needed. Furthermore we wanted an architecture that we can deploy to different (small) data centers in order to be as \emph{close} (in terms of latency) as possible to the sites we fetch. We intentionally left out other important aspects of web crawling such as indexing/searching, page importance, selection policy and Re-visit policies as many research has been done on those topics already \cite{page_importance1}\cite{page_importance2}\cite{wiki:web_crawler}. But we did design Crawl.js in such a way that features regarding those topics can be added easily some time later.
+\newline
+\newline
+With this in mind we are pretty satisfied with the experiences we gained throughout our work and with the final results we achieved. The node.js (JavaScript) environment proved itself to be a perfect fit for the implementation of Crawl.js. Because of its event-driven model we could keep our code clean and simple. Not only did we never struggle with concurrency-/deadlock situations but the purely asynchronous nature of it granted other advantages:
+\begin{itemize}
+\item Resource capacity. By tuning the number of concurrent connections we achieved to operate at full capacity (\~ 90\% CPU) easily.
+\item Good performance (~ 250 pages / second \& worker\ref{appendix_worker}), especially when taking into account that we parse the downloaded pages too.
+\item Integration with redis is a breeze.
+\end{itemize}
+Working with redis and using its data structures to manage our queues was another great decision we made. The set (sorted-set) structures gave us all the atomic operations we needed and performed very good in our simple experiments. Of course a cluster must be set up as the number of URLs grows to share the key space among multiple servers but for crawl.js nothing changes if using a cluster or a single server. Furthermore is the ability of distributing the key space to different servers (data-centers) a feature that the crawl.js system highly values. Remember we wanted an architecture deployable to different (small) data centers.
+\newline
+With the help of the set (sorted-set) structures we could also easily introduce groups (and blocks within them) in order to respect \emph{closeness} to the pages we fetch. Groups and blocks are nothing more than (set-)keys of the following form: 'group:X:block:Y'. And last but not least were the main redis commands used in crawl.js capable of handling multiple values at once. Therefore does crawl.js communicate efficiently by sending URLs in batches.
 
 \section{Future work}
 Here are some ideas how crawl.js could evolve in the future. They came across during our work and could not be implemented mostly because of time/focus constraints. The order is purely random and has nothing to do with our preference.
