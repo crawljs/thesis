@@ -197,7 +197,7 @@
 %	defined as \examname above so you cite it as \examname
 %----------------------------------------------------------------------------------------
 
-\thesistitle{Crawl.js - A decentralized crawler written in node.js} % Your thesis title - this is used in the title and abstract
+\thesistitle{Crawl.js - A decentralized crawler for node.js} % Your thesis title - this is used in the title and abstract
 %-------------------------------------------------  
 \supervisor{Prof. Pascal Felber} % You supervisor's name - this is used in the title page
 %-------------------------------------------------   
