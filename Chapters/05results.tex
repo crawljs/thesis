@@ -111,7 +111,14 @@ For the last property \emph{All pages are found} wikipedia provides a downloadab
 
 \section{Experiment 2}
 
-In this experiment we took the same setup as in experiment 1 (4 workers). Additionally we implemented an additional feature for crawl.js. A 2-level mapper. The goal of this experiment was to show that the new 2-level mapper performs as good and to introduce \emph{closeness}. By adding 50ms (100ms) of latency to bs.wikipedia.org we demonstrate how important it is for a worker to be \emph{close}. Or better, how bad it is to be \emph{far}. In experiment 3 we will reconfigure the system in order to obtain a shorter crawl duration with the same latencies used during this experiment.
+In this experiment we took the same components (4 workers) as in experiment 1. Because we implemented a novel 2-level mapper we first wanted to make sure it performs as good as the one used in experiment 1. Therefore we repeated the last test from experiment 1. Afterwards we changed the network topology. You can find a simple overview in Figure~\ref{test_setup2}. Basically we introduced two virtual regions by adding latencies between workers and wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
+
+\begin{figure}[h]
+\centering
+  \includegraphics[width=1.0\textwidth]{Figures/test_setup2.pdf}
+  \caption{Crawl.js - Test setup experiment 2 \& 3}
+\label{test_setup2}
+\end{figure}
 
 \subsection{2-level Mapper (Groups of workers)}
 This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms of latency) should be crawled by workers near them. 
@@ -128,57 +135,62 @@ In this experiment we used one group with 4 blocks to be as close to the configu
   \item Groups: 0: 4 blocks
   \item Workers: 4
   \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
-  \item Latency: none, 50ms \& 100ms on bs.wikipedia.org
+  \item Topologies: 1 (no latencies), 2 (2 regions, Figure~\ref{test_setup2})
 \end{itemize}
 
 \subsection{Analysis}
-Exactly as in experiment 1 all tests (0ms, 50ms, 100ms) started with a single seed URL. http://bn.wikipedia.org. With no latency we can see in Figure~\ref{plot:exp_002} that the novel 2-level mapper performs as good as the simple mapper (4m06s vs. 4m04s). The observed difference to experiment 1 is probably due to the cluster being more or less busy during our experiments. We repeated the test and measured 4m05s which enforces our assumption.
+Exactly as in experiment 1 all tests started with a single seed URL. http://bn.wikipedia.org. In topology 1 (no latencies) we can see in Figure~\ref{plot:exp_002} that the novel 2-level mapper performs as good as the simple mapper (4m06s vs. 4m04s). The observed difference to experiment 1 is probably due to the cluster being more or less busy during our experiments. We repeated the test and measured 4m05s which enforces our assumption.
 \\
-Regarding the latency we can see in Figure~\ref{plot:exp_002} that the crawl performance suffers drastically. In our simple setup the theoretical explanation for the measured values is straight forward (Figure~\ref{eq:exp_002}). When using the following values:
+Using topology 2 (Figure~\ref{test_setup2}) we can clearly see in Figure~\ref{plot:exp_002} that the crawl performance suffers drastically. In our simple setup the theoretical explanation for the measured values is straight forward. Note that we need to do it from the perspective of both regions. And because our crawl is not complete until \emph{both} regions are done our final result $D$ is the maximum out of both calculations. We will only illustrate the calculation of region 1, doing it for region 2 is analog. So, from the perspective of region 1 the calculation looks as follows:
+\newline
+\[ D_1 = \frac{n1}{c} dt_1 + \frac{n2}{c} dt_2 \]
+\newline
 \begin{itemize}
-  \item $n_{dt}:$ 130'966 (includes: 404, 500 etc.)
-  \item $n:$ 217'690 
-  \item $c:$ 40 ( 4 workers with 10 concurrent connections each)
-  \item $dt:$ 50ms (100ms)
+  \item $c:$ 20 ( 2 workers with 10 concurrent connections each)
+  \item $n1:$ 130'966 (bs.wikipedia.org)
+  \item $n2:$ 86'724 (bn.wikipedia.org)
+  \item $dt_1:$ 100ms
+  \item $dt_2:$ 200ms
 \end{itemize}
 
-We get a delay (D) of approximately 4.5 minutes (9 minutes) for a latency of 50ms (100ms). These calculations are pretty good in line with the measured values.
+For $D_1$ we get 25.38 minutes and for $D_2$ (region 2, switch $dt_1$ and $dt_2$) 29.05 minutes. Therefore the crawl delay $D$ is \emph{29.05 minutes}. As you can see in Figure~\ref{plot:exp_002} these calculations are pretty good in line with the measured values.
 
 \begin{figure}
   \centering
-  \[ D = \frac{n_{dt} dt}{\frac{c n_{dt}}{n}} \]
+  \[ D = \sum\limits_{k=1}^s \frac{n_k}{c} (dt_k) \]
   \begin{tabular}{@{}>{$}l<{$}l@{}}
-    n_{dt} & Number of pages with latency\\
-    dt & latency\\
-    n & Total number of pages \\
-    c & Concurrent connections\\
+    D & total crawl delay\\
+    s & number of sites\\
+    n_k & pages on site k\\
+    dt_k & latency on site k\\
+    c & Concurrent connections (constant)\\
   \end{tabular}
-\caption{Equation: Total crawl delay (D)}
-\label{eq:exp_002}
+  \caption{Equation: Total crawl delay D}
+  \label{eq:exp_002}
 \end{figure}
 
 \begin{figure}
-\centering
+  \centering
   \begin{tikzpicture} 
     \begin{axis}[
-      ybar,
-      bar width=12pt,
-      axis y line*=left,
-      enlargelimits=0.2,
-      xlabel={Latency [ms]},
-      xlabel near ticks,
-      ylabel={Minutes},
-      ylabel near ticks,
-      xtick=data,
-      nodes near coords,
-      nodes near coords align={vertical},
+        ybar,
+        bar width=12pt,
+        axis y line*=left,
+        enlargelimits=0.2,
+        xlabel={Network topology},
+        xlabel near ticks,
+        ylabel={Minutes},
+        ylabel near ticks,
+        xtick=data,
+        nodes near coords,
+        nodes near coords align={vertical},
       ]
       \addplot
-        coordinates {(0,4.1) (50,7.4) (100,13.22)};
+      coordinates {(1,4.1) (2,29)};
     \end{axis}
   \end{tikzpicture}
-\caption{Crawl durations (4 workers) with different latencies}
-\label{plot:exp_002}
+  \caption{Crawl duration T on different topologies}
+  \label{plot:exp_002}
 \end{figure}
 
 \section{Experiment 3}
@@ -203,25 +215,25 @@ Test one exactly reflects the same setup as in experiment 2. 1 group with 4 work
 \subsection{Analysis}
 
 \begin{figure}
-\centering
+  \centering
   \begin{tikzpicture} 
     \begin{axis}[
-      ybar,
-      bar width=12pt,
-      axis y line*=left,
-      enlargelimits=0.2,
-      xlabel={Group Configurations},
-      xlabel near ticks,
-      ylabel={Minutes},
-      ylabel near ticks,
-      xtick=data,
-      nodes near coords,
-      nodes near coords align={vertical},
+        ybar,
+        bar width=12pt,
+        axis y line*=left,
+        enlargelimits=0.2,
+        xlabel={Group Configurations},
+        xlabel near ticks,
+        ylabel={Minutes},
+        ylabel near ticks,
+        xtick=data,
+        nodes near coords,
+        nodes near coords align={vertical},
       ]
       \addplot
-        coordinates {(0,13.2) (1,25.05) (2,16.3)};
+      coordinates {(0,13.2) (1,25.05) (2,16.3)};
     \end{axis}
   \end{tikzpicture}
-\caption{Crawl performance using different group configurations}
-\label{plot:exp_003}
+  \caption{Crawl performance using different group configurations}
+  \label{plot:exp_003}
 \end{figure}
