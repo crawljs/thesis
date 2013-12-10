@@ -8,8 +8,25 @@
 
 After discussing how crawl.js works we want to run some experiments. We decided to test crawl.js in a closed environment. Crawling the public internet requires a good supervision and the required work to do that is simply out of scope for this thesis. All experiments were done on the opennebula cluster hosted at the university of neuchatel.
 \\
-First we describe our \emph{setup} and afterwards we discuss the different experiments we ran on it. \emph{Experiment 1} focuses on verifying basic properties of crawl.js (e.g. scaling). In \emph{Experiment 2 \& 3} we introduce latency and compare two different \emph{mapper}~\ref{mapper} approaches. A simple (random,hash) URL to worker assignment and a 2-level assignment.
+First we describe our \emph{measurement} techniques and how our \emph{setup} looks like. The \emph{setup} will stay the same during all experiments but we will use different network topologies (achieved with virtual latencies) during our work. In \emph{experiment 1} we use a topology with one region (no latencies) to verify some basic properties of crawl.js (e.g. scaling). In \emph{Experiment 2 \& 3} we introduce a new topology with 2 regions and focus on the \emph{closeness} aspect of crawl.js.
+\\
+Additionally we implemented a novel \emph{mapper} used throughout all our experiments.
 
+\section{Measurement}
+Throughout our experiments we use the unit pages/second to measure performance. We measure every worker independently, so the overall system performance is the sum of all measured worker performances. One worker measurement is done as follows:
+\begin{itemize}
+  \item We instrument how long it takes to crawl \emph{10'000 pages}
+  \item Taking the arithmetic mean gives us \emph{pages/second} per worker
+  \item Because we observed a big variance in our values we repeated one worker measurement \emph{3 times} and computed again the arithmetic mean.
+\end{itemize}
+Of course this unit depends highly on the worker hardware. Our numbers are base on a hardware configuration as detailed in Appendix~\ref{AppendixB}
+
+\section{2-level Mapper (Groups of workers)}
+This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms of latency) should be crawled by workers near them. 
+\newline
+As the name suggests it, the URL to worker assignment is done using 2 levels. The first level (e.g. hostname) determines the group and the second level (e.g. path + query part) identifies the worker within that group. The 2-level mapper introduces the notion of groups to crawl.js and adds an additional dimension to the configuration. Previously we had 1 dimension: url-blocks. Now we have 2: groups \& blocks within that group. Note that each group can be configured independently. 1 group may have 1 worker and another 3 (e.g. depending on the number of URLs a group is responsible for).
+\newline
+With groups we have now the ability to configure crawl.js in such a way that \emph{closeness} is respected. For example we can create a group \emph{region 1} responsible for crawling sites \emph{close} to that region. How different group configurations affects the total crawl performance will be shown in experiment 3.
 
 \section{Setup}
 To do our experiments we had to setup the following types of VM in the cluster:
@@ -62,7 +79,7 @@ The goal of our first experiment was to verify the following basic properties of
 
 \begin{itemize}
   \item The crawl stops
-  \item Adding more workers reduces the crawl duration (1, 2 \& 4 workers)
+  \item Adding more workers improves the overall crawl performance (1, 2, 3 \& 4 workers)
   \item All pages are found (starting with a single seed URL)
 \end{itemize}
 
@@ -71,15 +88,17 @@ The goal of our first experiment was to verify the following basic properties of
 Here is an overview of the configuration we used.
 
 \begin{itemize}
-  \item Mapper: simple (random URL to worker assignment)
-  \item Workers: 1, 2 \& 4
-  \item Sites: http://bn.wikipedia.org, http://bs.wikipedia.org (142'082 articles)
-  \item Site latencies: None
+  \item Workers: 1, 2, 3 \& 4
+  \item Sites: http://bn.wikipedia.org, http://bs.wikipedia.org
+  \item Topology: 1 region (no latencies)
 \end{itemize}
 
 \subsection{Analysis}
 
- All tests (1, 2 and 4 workers) started with the same seed URL (http://bn.wikipedia.org) and as shown in Figure~\ref{plot:exp_001} the first results verified both properties: \emph{The crawl stops} and \emph{Adding more workers reduces the crawl duration}. The scaling behaviour actually exceeded our expectations as it was almost linear. The communication overhead needed to perform a crawl with more than 1 worker was minimal. A possible explanation for this overhead is worker idle times. Because every worker flushes the newly found URLs only once every 10 seconds (configurable), other workers could ran out of work and be forced to wait (and re ask later). Verifying this assumption would require an additional experiment. Basically exactly the same experiment but starting with many seed URLs (those found during this experiment for example). We are pretty sure that with a big seed list idling would not happen or at least be shorter.
+All tests (1, 2 and 4 workers) started with the same seed URL (http://bn.wikipedia.org). Verifying the first property \emph{the crawl stops} was straight forward and done manually. \emph{Adding more workers improves the overall crawl performance} is verified too as shown in Figure~\ref{plot:exp_001}. The scaling behaviour actually exceeded our expectations at it was linear. But scaling up from one to two workers showed an unexpected effect. We achieved more pages/second \emph{per worker} with 2 workers running simultaniously (456/2 = 228 vs. 168). And even more with 3 workers running (850/3 = 283 vs. 228). This is not an intuitive behaviour as it is better than a linear scaling. But as the number of workers grows (3,4,5) this rather nice side effect disappears and we achieve a still very good linear scaling behaviour.
+\newline
+\newline
+So, how to explain this unwanted effect? We explain it as follows: ???
 \newline
 \newline
 For the last property \emph{All pages are found} wikipedia provides a downloadable text file containing all article URLs. Using this file we were able to import the expected URLs into redis (set datastructure). Afterwards we took the difference (redis diff) between the two sets 'urls:expected' and 'urls:crawled'. Unfortunately the resulting set was not empty. It had 23'338 URLs. That number seemed us pretty huge, thats about 16\% of all articles. Did we miss that many URLs? We decided to have a closer look at some randomly picked articles to check what we actually missed. We discovered quickly that most of these 'missed' articles redirected (alias) to other articles we did crawl (13'391 redirect articles). Because articles never reference articles through an alias, crawl.js did not discover those 'redirect-articles' (as we follow references,<a> tags). This still leaves us with 9'947 (7\%) of potentially missed articles. Again we randomly picked some of the remaining articles and discovered that none of them were referenced by other articles (using grep -r). Of course we did not check for references to all remaining articles but 7\% of orphaned articles~\footnote{\url{http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Orphanage}} seemed us realistic and therefore the verification of this property good enough to proceed with our experiments.
@@ -95,23 +114,23 @@ For the last property \emph{All pages are found} wikipedia provides a downloadab
       axis y line*=left,
       xlabel={Workers},
       xlabel near ticks,
-      ylabel={Minutes},
+      ylabel={Pages/second},
       ylabel near ticks,
       xtick=data,
       nodes near coords,
       nodes near coords align={vertical},
       ]
       \addplot
-        coordinates {(1,13.78) (2,7.47) (4,4.07)};
+        coordinates {(1,169) (2,456) (3,850) (4,1069)};
     \end{axis}
   \end{tikzpicture}
-\caption{Scaling behaviour (1,2 \& 4 workers)}
+\caption{Scaling behaviour (1, 2, 3 \& 4 workers)}
 \label{plot:exp_001}
 \end{figure}
 
 \section{Experiment 2}
 
-In this experiment we took the same components (4 workers) as in experiment 1. Because we implemented a novel 2-level mapper we first wanted to make sure it performs as good as the one used in experiment 1. Therefore we repeated the last test from experiment 1. Afterwards we changed the network topology. You can find a simple overview in Figure~\ref{test_setup2}. Basically we introduced two virtual regions by adding latencies between workers and wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
+In this experiment we took the same components (4 workers) as in experiment 1 but we introduced a new network topology with 2 regions as shown in Figure~\ref{test_setup2}. Basically we introduced two virtual regions by adding latencies between workers and wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
 
 \begin{figure}[h]
 \centering
@@ -120,22 +139,12 @@ In this experiment we took the same components (4 workers) as in experiment 1. B
 \label{test_setup2}
 \end{figure}
 
-\subsection{2-level Mapper (Groups of workers)}
-This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms of latency) should be crawled by workers near them. 
-\newline
-As the name suggests it, the URL to worker assignment is done using 2 levels. The first level (e.g. hostname) determines the group and the second level (e.g. path + query part) identifies the worker within that group. The 2-level mapper introduces the notion of groups to crawl.js and adds an additional dimension to the configuration. Previously we had 1 dimension: url-blocks. Now we have 2: groups \& blocks within that group. Note that each group can be configured independently. 1 group may have 1 worker and another 3 (e.g. depending on the number of URLs a group is responsible for).
-\newline
-With groups we have now the ability to configure crawl.js in such a way that \emph{closeness} is respected. For example we can create a group \emph{switzerland} responsible for crawling the top-level domain \emph{ch}. How different group configurations affects the total crawl duration will be shown in experiment 3.
-\newline
-In this experiment we used one group with 4 blocks to be as close to the configuration used in experiment 1.
-
 \subsection{Configuration}
 \begin{itemize}
-  \item Mapper: 2-level
   \item Groups: 0: 4 blocks
   \item Workers: 4
   \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
-  \item Topologies: 1 (no latencies), 2 (2 regions, Figure~\ref{test_setup2})
+  \item Topologies: 1 region (no latencies) and 2 regions (Figure~\ref{test_setup2})
 \end{itemize}
 
 \subsection{Analysis}
@@ -178,18 +187,19 @@ For $D_1$ we get 25.38 minutes and for $D_2$ (region 2, switch $dt_1$ and $dt_2$
         axis y line*=left,
         enlargelimits=0.2,
         xlabel={Network topology},
+        symbolic x coords={1 region, 2 regions},
         xlabel near ticks,
-        ylabel={Minutes},
+        ylabel={pages/second},
         ylabel near ticks,
         xtick=data,
         nodes near coords,
         nodes near coords align={vertical},
       ]
       \addplot
-      coordinates {(1,4.1) (2,29)};
+      coordinates {(1 region,1069) (2 regions,0)};
     \end{axis}
   \end{tikzpicture}
-  \caption{Crawl duration T on different topologies}
+  \caption{Crawl performance on different network topologies}
   \label{plot:exp_002}
 \end{figure}
 
