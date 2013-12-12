@@ -17,9 +17,9 @@ Throughout our experiments we use the unit pages/second to measure performance. 
 \begin{itemize}
   \item We instrument how long it takes to crawl \emph{10'000 pages}
   \item Taking the arithmetic mean gives us \emph{pages/second} per worker
-  \item Because we observed a big variance in our values we repeated one worker measurement \emph{3 times} and computed again the arithmetic mean.
+  \item Because we observed a big variance in our values we repeated one worker measurement several time and computed again the arithmetic mean.
 \end{itemize}
-Of course this unit depends highly on the worker hardware. Our numbers are base on a hardware configuration as detailed in Appendix~\ref{AppendixB}
+Of course this unit depends highly on the worker hardware. Our numbers are base on a hardware configuration as detailed in Appendix~\ref{appendix:worker}
 
 \section{2-level Mapper (Groups of workers)}
 This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms of latency) should be crawled by workers near them. 
@@ -79,7 +79,7 @@ The goal of our first experiment was to verify the following basic properties of
 
 \begin{itemize}
   \item The crawl stops
-  \item Adding more workers improves the overall crawl performance (1, 2, 3 \& 4 workers)
+  \item Adding more workers improves the overall crawl performance.
   \item All pages are found (starting with a single seed URL)
 \end{itemize}
 
@@ -88,17 +88,14 @@ The goal of our first experiment was to verify the following basic properties of
 Here is an overview of the configuration we used.
 
 \begin{itemize}
-  \item Workers: 1, 2, 3 \& 4
+  \item Workers: 1, 2, 3, 4 \& 5
   \item Sites: http://bn.wikipedia.org, http://bs.wikipedia.org
   \item Topology: 1 region (no latencies)
 \end{itemize}
 
 \subsection{Analysis}
 
-All tests (1, 2 and 4 workers) started with the same seed URL (http://bn.wikipedia.org). Verifying the first property \emph{the crawl stops} was straight forward and done manually. \emph{Adding more workers improves the overall crawl performance} is verified too as shown in Figure~\ref{plot:exp_001}. The scaling behaviour actually exceeded our expectations at it was linear. But scaling up from one to two workers showed an unexpected effect. We achieved more pages/second \emph{per worker} with 2 workers running simultaniously (456/2 = 228 vs. 168). And even more with 3 workers running (850/3 = 283 vs. 228). This is not an intuitive behaviour as it is better than a linear scaling. But as the number of workers grows (3,4,5) this rather nice side effect disappears and we achieve a still very good linear scaling behaviour.
-\newline
-\newline
-So, how to explain this unwanted effect? We explain it as follows: ???
+All tests started with the same seed URL (http://bn.wikipedia.org). Verifying the first property \emph{the crawl stops} was straight forward and done manually. \emph{Adding more workers improves the overall crawl performance} was verified too as shown in Figure~\ref{plot:exp_001}. The scaling behaviour actually exceeded our expectations as it was linear. We were able to add workers and observe a constant increase of the whole system performance. Doing this we also observed that the performance per worker reaches its maximum only in a system with at least 3 workers (\~260 pages/second). We tried to explain this behaviour with bandwidth limitations a single worker has (100mbit), but our assumptions turned out to be wrong and we still can't explain it. Hopefully, a system with less than 3 workers is rather uncommon and we decided to not further investigate in finding the bottleneck causing this behaviour.
 \newline
 \newline
 For the last property \emph{All pages are found} wikipedia provides a downloadable text file containing all article URLs. Using this file we were able to import the expected URLs into redis (set datastructure). Afterwards we took the difference (redis diff) between the two sets 'urls:expected' and 'urls:crawled'. Unfortunately the resulting set was not empty. It had 23'338 URLs. That number seemed us pretty huge, thats about 16\% of all articles. Did we miss that many URLs? We decided to have a closer look at some randomly picked articles to check what we actually missed. We discovered quickly that most of these 'missed' articles redirected (alias) to other articles we did crawl (13'391 redirect articles). Because articles never reference articles through an alias, crawl.js did not discover those 'redirect-articles' (as we follow references,<a> tags). This still leaves us with 9'947 (7\%) of potentially missed articles. Again we randomly picked some of the remaining articles and discovered that none of them were referenced by other articles (using grep -r). Of course we did not check for references to all remaining articles but 7\% of orphaned articles~\footnote{\url{http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Orphanage}} seemed us realistic and therefore the verification of this property good enough to proceed with our experiments.
@@ -121,10 +118,10 @@ For the last property \emph{All pages are found} wikipedia provides a downloadab
       nodes near coords align={vertical},
       ]
       \addplot
-        coordinates {(1,169) (2,456) (3,850) (4,1069)};
+        coordinates {(1,169) (2,456) (3,850) (4,1069) (5,1326)};
     \end{axis}
   \end{tikzpicture}
-\caption{Scaling behaviour (1, 2, 3 \& 4 workers)}
+\caption{Scaling behaviour (1, 2, 3, 4 \& 5 workers)}
 \label{plot:exp_001}
 \end{figure}
 
@@ -135,7 +132,7 @@ In this experiment we took the same components (4 workers) as in experiment 1 bu
 \begin{figure}[h]
 \centering
   \includegraphics[width=1.0\textwidth]{Figures/test_setup2.pdf}
-  \caption{Crawl.js - Test setup experiment 2 \& 3}
+  \caption{Network Topology: 2 regions (with latencies)}
 \label{test_setup2}
 \end{figure}
 
@@ -148,35 +145,23 @@ In this experiment we took the same components (4 workers) as in experiment 1 bu
 \end{itemize}
 
 \subsection{Analysis}
-Exactly as in experiment 1 all tests started with a single seed URL. http://bn.wikipedia.org. In topology 1 (no latencies) we can see in Figure~\ref{plot:exp_002} that the novel 2-level mapper performs as good as the simple mapper (4m06s vs. 4m04s). The observed difference to experiment 1 is probably due to the cluster being more or less busy during our experiments. We repeated the test and measured 4m05s which enforces our assumption.
-\\
-Using topology 2 (Figure~\ref{test_setup2}) we can clearly see in Figure~\ref{plot:exp_002} that the crawl performance suffers drastically. In our simple setup the theoretical explanation for the measured values is straight forward. Note that we need to do it from the perspective of both regions. And because our crawl is not complete until \emph{both} regions are done our final result $D$ is the maximum out of both calculations. We will only illustrate the calculation of region 1, doing it for region 2 is analog. So, from the perspective of region 1 the calculation looks as follows:
-\newline
-\[ D_1 = \frac{n1}{c} dt_1 + \frac{n2}{c} dt_2 \]
-\newline
+Exactly as in experiment 1 all tests started with a single seed URL (http://bn.wikipedia.org). Figure~\ref{plot:exp_002} shows our measured performances, once for a network topology without latencies (from experiment 1) and once for the new network topology with latencies (2 regions). As you can see the performance difference is huge. Crawling on the second network topology is more than 9 times worse. Based on the latencies we added this observation can be explained as follows. Because we fetch many pages in parallel we first need to break down the performance to one connection:
+\[ 
+  P_c = P / c
+\]
 \begin{itemize}
-  \item $c:$ 20 ( 2 workers with 10 concurrent connections each)
-  \item $n1:$ 130'966 (bs.wikipedia.org)
-  \item $n2:$ 86'724 (bn.wikipedia.org)
-  \item $dt_1:$ 100ms
-  \item $dt_2:$ 200ms
+  \item $ P1_c = 26.725 $ pages/second (P := 1069, c:= 40) 
+  \item $ P2_c = 2.8 $ pages/second (P := 112, c:= 40)
 \end{itemize}
-
-For $D_1$ we get 25.38 minutes and for $D_2$ (region 2, switch $dt_1$ and $dt_2$) 29.05 minutes. Therefore the crawl delay $D$ is \emph{29.05 minutes}. As you can see in Figure~\ref{plot:exp_002} these calculations are pretty good in line with the measured values.
-
-\begin{figure}
-  \centering
-  \[ D = \sum\limits_{k=1}^s \frac{n_k}{c} (dt_k) \]
-  \begin{tabular}{@{}>{$}l<{$}l@{}}
-    D & total crawl delay\\
-    s & number of sites\\
-    n_k & pages on site k\\
-    dt_k & latency on site k\\
-    c & Concurrent connections (constant)\\
-  \end{tabular}
-  \caption{Equation: Total crawl delay D}
-  \label{eq:exp_002}
-\end{figure}
+Of course $ \frac{1}{P_c} $ is the time we need to crawl one page.
+\\
+\begin{itemize}
+  \item $ \frac{1}{P1_c} = \frac{1}{26.725} $ seconds/page
+  \item $ \frac{1}{P2_c} = \frac{1}{2.8} $ seconds/page
+\end{itemize}
+So, intuitively the difference $ P2_c - P1_c $ should roughly be equal to the latencies we added.
+\[ \frac{1}{2.8} - \frac{1}{26.725} \approx  0.320 \]
+But our expected mean latency is $ \approx 0.160 $ (based on the fraction pages on wiki-bs/wiki-bn). We miss a factor 2. Why?
 
 \begin{figure}
   \centering
@@ -196,7 +181,7 @@ For $D_1$ we get 25.38 minutes and for $D_2$ (region 2, switch $dt_1$ and $dt_2$
         nodes near coords align={vertical},
       ]
       \addplot
-      coordinates {(1 region,1069) (2 regions,0)};
+      coordinates {(1 region,1069) (2 regions,112)};
     \end{axis}
   \end{tikzpicture}
   \caption{Crawl performance on different network topologies}
