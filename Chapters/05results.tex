@@ -73,6 +73,9 @@ The worker VM hosts our developed crawler (crawl.js instance). Setting it up was
   \item RAM: 1024M
 \end{itemize}
 
+\subsection{Stores}
+You may have noticed that this component is missing in our test setup. We intentionally left it out in order to focus on other aspects such as respecting closeness and correct URL handling within the \emph{queues} in redis. Disabling the \emph{store} component was a matter of changing a configuration value. In all our experiments we used the \emph{dummy} store implementation which does nothing but pipe the downloaded content to /dev/null.
+
 \section{Experiment 1}
 
 The goal of our first experiment was to verify the following basic properties of crawl.js.
@@ -83,6 +86,15 @@ The goal of our first experiment was to verify the following basic properties of
   \item All pages are found (starting with a single seed URL)
 \end{itemize}
 
+Therefore we used simple network topology with one region and no latencies as shown in Figure~\ref{topology_exp1}
+
+\begin{figure}[h]
+\centering
+  \includegraphics[width=1.0\textwidth]{Figures/topology_exp1.pdf}
+  \caption{Network Topology: 1 region, 1 group (no latencies)}
+\label{topology_exp1}
+\end{figure}
+
 \subsection{Configuration}
 
 Here is an overview of the configuration we used.
@@ -90,7 +102,7 @@ Here is an overview of the configuration we used.
 \begin{itemize}
   \item Workers: 1, 2, 3, 4 \& 5
   \item Sites: http://bn.wikipedia.org, http://bs.wikipedia.org
-  \item Topology: 1 region (no latencies)
+  \item Topology: 1 region (no latencies) as shown in Figure~\ref{topology_exp1}
 \end{itemize}
 
 \subsection{Analysis}
@@ -127,13 +139,13 @@ For the last property \emph{All pages are found} wikipedia provides a downloadab
 
 \section{Experiment 2}
 
-In this experiment we took the same components (4 workers) as in experiment 1 but we introduced a new network topology with 2 regions as shown in Figure~\ref{test_setup2}. Basically we introduced two virtual regions by adding latencies between workers and wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
+In this experiment we took the same components (4 workers) as in experiment 1 but we introduced a new network topology with 2 regions as shown in Figure~\ref{topology_exp2}. Basically we introduced two virtual regions by adding latencies between workers and wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
 
 \begin{figure}[h]
 \centering
-  \includegraphics[width=1.0\textwidth]{Figures/test_setup2.pdf}
-  \caption{Network Topology: 2 regions (with latencies)}
-\label{test_setup2}
+  \includegraphics[width=1.0\textwidth]{Figures/topology_exp2.pdf}
+  \caption{Network Topology: 2 regions, 1 group (with latencies)}
+\label{topology_exp2}
 \end{figure}
 
 \subsection{Configuration}
@@ -141,27 +153,59 @@ In this experiment we took the same components (4 workers) as in experiment 1 bu
   \item Groups: 0: 4 blocks
   \item Workers: 4
   \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
-  \item Topologies: 1 region (no latencies) and 2 regions (Figure~\ref{test_setup2})
+  \item Topologies: 1 region (Figure~\ref{topology_exp1}) and 2 regions (Figure~\ref{topology_exp2})
 \end{itemize}
 
 \subsection{Analysis}
-Exactly as in experiment 1 all tests started with a single seed URL (http://bn.wikipedia.org). Figure~\ref{plot:exp_002} shows our measured performances, once for a network topology without latencies (from experiment 1) and once for the new network topology with latencies (2 regions). As you can see the performance difference is huge. Crawling on the second network topology is more than 9 times worse. Based on the latencies we added this observation can be explained as follows. Because we fetch many pages in parallel we first need to break down the performance to one connection:
+Exactly as in experiment 1 all tests started with a single seed URL (http://bn.wikipedia.org). Figure~\ref{plot:exp_002} shows our measured performances, once for a network topology without latencies (from experiment 1) and once for the new network topology with latencies (2 regions). As you can see the performance difference is huge. Crawling on the second network topology is more than 4 times worse. Based on the latencies we added this observation can be explained as follows. Because we fetch many pages in parallel we first need to break down the performance to one connection:
 \[ 
-  P_c = P / c
+  P_c = \frac{P}{n_w n_c}
 \]
+\begin{tabular}{@{}>{$}l<{$}l@{}}
+  n_w & Number of workers\\
+  n_c & Concurrent connections per worker\\
+  P & Measured overall performance\\
+P_c & Performance per connection\\
+\end{tabular}
+
 \begin{itemize}
-  \item $ P1_c = 26.725 $ pages/second (P := 1069, c:= 40) 
-  \item $ P2_c = 2.8 $ pages/second (P := 112, c:= 40)
+  \item $ P1_c (P2_c) $ is the performance per connection for topology 1 (2) 
+  \item $ P1_c = 22.15 $ pages/second ($ n_w = 4, n_c = 10, P = 886 $) 
+  \item $ P2_c = 5.25 $ pages/second ($ n_w = 4, n_c = 10, P = 210 $)
 \end{itemize}
 Of course $ \frac{1}{P_c} $ is the time we need to crawl one page.
-\\
 \begin{itemize}
-  \item $ \frac{1}{P1_c} = \frac{1}{26.725} $ seconds/page
-  \item $ \frac{1}{P2_c} = \frac{1}{2.8} $ seconds/page
+  \item $ \frac{1}{P1_c} = \frac{1}{22.15} $ seconds/page
+  \item $ \frac{1}{P2_c} = \frac{1}{5.25} $ seconds/page
 \end{itemize}
-So, intuitively the difference $ P2_c - P1_c $ should roughly be equal to the latencies we added.
-\[ \frac{1}{2.8} - \frac{1}{26.725} \approx  0.320 \]
-But our expected mean latency is $ \approx 0.160 $ (based on the fraction pages on wiki-bs/wiki-bn). We miss a factor 2. Why?
+
+So, intuitively the difference $ \frac{1}{P2_c} - \frac{1}{P1_c} $ should roughly be equal to expected mean latency.
+\[ \frac{1}{5.25} - \frac{1}{22.15} \approx  0.145\]
+
+Our expected mean latency is $ \approx 0.075s $, assuming that the number of pages on both sites is equal. So why do we still miss an additional $ \approx 0.07s $. More precisely a factor 2. In order to explain that we need to have a look at the following \emph{tcpdump} extract made on an average\footnote{Average in terms of size. Larger pages have a higher-, smaller pages a lower total latency. Therefore we use an average page size as an approximation} page.
+
+\begin{lstlisting}[language=bash]
+#page size: 14607 bytes, latency: 100ms
+
+duration: 0.100 + 0.402 = 0.502s
+
+handshake: 0.200s
+17:38:31.477105 IP 192.168.98.9.59418 > 192.168.98.16.http: ...
+17:38:31.477137 IP 192.168.98.16.http > 192.168.98.9.59418: ...
+17:38:31.577468 IP 192.168.98.9.59418 > 192.168.98.16.http: ...
+
+payload: 0.200s
+17:38:31.577924 IP 192.168.98.9.59418 > 192.168.98.16.http: ...
+...
+17:38:31.779264 IP 192.168.98.9.59418 > 192.168.98.16.http: ...
+
+close: 0.100s
+17:38:31.779489 IP 192.168.98.9.59418 > 192.168.98.16.http: ...
+17:38:31.779539 IP 192.168.98.16.http > 192.168.98.9.59418: ...
+17:38:31.879843 IP 192.168.98.9.59418 > 192.168.98.16.http: ...
+\end{lstlisting}
+
+As you can see adding 100ms (same goes for 150ms) of latency results in a total duration of 0.502s. So in a scenario where we open and close a tcp connection for each page we need to consider a factor 5 between added latency and effective duration on this average page. But in our above logical consequences we need a factor 2. Hopefully news aren't so bad. Crawl.js keeps sockets open and therefore handshaking/closing the connection is done once only.\footnote{In real world things are even more complicated (several handshaking/closing) because we fetch from different sites simultaneously.}. So removing those phases results in a total duration of $ \approx 0.200s $ which is twice (factor 2) as long as our added latency. And our above logics are valid.
 
 \begin{figure}
   \centering
@@ -181,7 +225,7 @@ But our expected mean latency is $ \approx 0.160 $ (based on the fraction pages 
         nodes near coords align={vertical},
       ]
       \addplot
-      coordinates {(1 region,1069) (2 regions,112)};
+      coordinates {(1 region, 886) (2 regions,210)};
     \end{axis}
   \end{tikzpicture}
   \caption{Crawl performance on different network topologies}
@@ -190,24 +234,24 @@ But our expected mean latency is $ \approx 0.160 $ (based on the fraction pages 
 
 \section{Experiment 3}
 
-In the previous experiment we showed that latency on sites affects the crawl performance heavily. In this experiment we want to demonstrate that crawl.js is able to deal with different latencies on different sites. We want to show that when using the exact same latency configurations (100ms) as in experiment 2 we are able to achieve better performances by reconfiguring crawl.js. We will keep the number of workers the same but we will re-group them differently in order to respect \emph{closeness}.
+In the previous experiment we showed that latency on sites affects the crawl performance heavily. In this experiment we want to demonstrate that crawl.js is able to deal with different latencies on different sites. We want to show that when using the same topology as in experiment 2 we are able to achieve better performances by reconfiguring crawl.js. We will keep the number of workers the same but we will re-group them differently in order to respect \emph{closeness}. Figure~\ref{topology_exp3} shows how we re-grouped the workers. 
 
 \subsection{Configuration}
-Test one exactly reflects the same setup as in experiment 2. 1 group with 4 workers and 100ms latency on bs.wikipedia.org. We repeat it just to confirm the measured results in experiment 2 and to prepare for the remaining tests. Because there is only one group and the URL to worker assignment is done randomly every worker is affected by the latency. In order to achieve a better performance we need workers that are not affected by the latency. Therefore we introduce a second group (Test 2 \& 3). One group is responsible for bs.wikipedia.org (100ms latency) and the other one for bn.wikipedia.org (no latency). With this setup we are be able to have workers that can operate on sites without (or with less) latency. We do 2 different tests with those 2 groups. First we keep the groups equally powerful by assigning 2 workers to each of them, second we rebalance the groups by moving 1 worker to the other group. This way we will have one group with a single worker responsible for bn.wikipedia.org (no latency) and another group with 3 workers responsible for bs.wikipedia.org (100ms latency). You can see the measured crawl durations in Figure~\ref{plot:exp_003}.
+In experiment 2 we had only one group and the URL to worker assignment was done randomly. The result was that every worker was affected by the latency. So in order to achieve a better performance we need to avoid cross-region crawls. Therefore we introduce a second group and each group will be assigned to one site only. Group 0 for bs.wikipedia.org and group 1 for bn.wikipedia.org. With this setup workers won't be affected anymore by the cross-region latencies which should result in better crawl performances. Figure~\ref{plot:exp_003} shows our measurements.
 \begin{itemize}
-  \item Mapper: 2-level
   \item Workers: 4
   \item Groups:
     \begin{itemize}
-      \item Config 0: 1 group with 4 blocks
-      \item Config 1: 2 groups with 2 blocks each
-      \item Config 2: 1 group with 1 block, 1 group with 3 blocks
+      \item Config 0: 1 group with 4 blocks (as in experiment 2)
+      \item Config 1: 2 groups with 2 blocks each (as shown in Figure~\ref{topology_exp3})
     \end{itemize}
   \item Sites: http://bs.wikipedia.org, http://bn.wikipedia.org
-  \item Latency: 100ms on bs.wikipedia.org
+  \item Topology: 2 regions (Figure~\ref{topology_exp3})
 \end{itemize}
 
 \subsection{Analysis}
+
+Figure~\ref{plot:exp_003} shows to measurements, the previous value from experiment 2 and the new value from this experiment. As you can see we were able to improve the crawl performance heavily. A simple reconfiguration made all workers crawl latency-free sites only and this in turn resulted in a performance almost as good as measured in experiment 1 (1 region, no latencies). This fact clearly demonstrates that crawl.js can be configured in such a way that \emph{closeness} to sites is respected. This is what this experiment was all about.
 
 \begin{figure}
   \centering
@@ -218,6 +262,7 @@ Test one exactly reflects the same setup as in experiment 2. 1 group with 4 work
         axis y line*=left,
         enlargelimits=0.2,
         xlabel={Group Configurations},
+        symbolic x coords={1 group, 2 groups},
         xlabel near ticks,
         ylabel={Minutes},
         ylabel near ticks,
@@ -226,9 +271,16 @@ Test one exactly reflects the same setup as in experiment 2. 1 group with 4 work
         nodes near coords align={vertical},
       ]
       \addplot
-      coordinates {(0,13.2) (1,25.05) (2,16.3)};
+      coordinates {(1 group,210) (2 groups,983)};
     \end{axis}
   \end{tikzpicture}
-  \caption{Crawl performance using different group configurations}
+  \caption{Crawl performance using different group configurations (on 2 regions)}
   \label{plot:exp_003}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+  \includegraphics[width=1.0\textwidth]{Figures/topology_exp3.pdf}
+  \caption{Network Topology: 2 regions, 2 groups (with latencies)}
+\label{topology_exp3}
 \end{figure}

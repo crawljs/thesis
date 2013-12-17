@@ -4,7 +4,7 @@
 \label{appendix:config.json} % For referencing this appendix elsewhere, use \ref{AppendixA}
 \lhead{Appendix A. \emph{Configuration - config.json - Experiment 3}} % This is for the header on each page - perhaps a shortened title
 
-Here you find the configuration as used during Experiment 3. More precisely test 3 of experiment 3. It uses a total of 4 workers (10 connections each) assigned to 2 groups. Group 0 having 1 worker and group 1 with 3 workers.
+Here you find the configuration as used in Experiment 3. We have 2 groups with 2 workers each.
 \newline
 The format is in JSON.\cite{wiki:json}
 \begin{lstlisting}[language=JavaScript]
@@ -17,17 +17,17 @@ The format is in JSON.\cite{wiki:json}
       {"hostname": "bn.wikipedia.org", "group": 1 }
     ],
     "groups": [
-      {"group": 0, "blocks": 1},
-      {"group": 1, "blocks": 3}
+      {"group": 0, "blocks": 2},
+      {"group": 1, "blocks": 2}
     ]
   },
   "fetcher": {
     "instances": 10,
     "request": {
-        "jar": true,
         "timeout": 30000,
         "followRedirect": true,
         "maxRedirects": 3,
+        "maxSockets": 10,
         "headers": {
           "User-Agent": "crawl.js v0.0.1"
         }
