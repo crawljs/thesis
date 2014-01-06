@@ -37,7 +37,7 @@
 \usepackage{dirtree}
 \usepackage{tikz}
 \usepackage{pgfplots}
-\hypersetup{urlcolor=black, colorlinks=true} % Colors hyperlinks in blue - change to black if annoying
+\hypersetup{urlcolor=black, colorlinks=false} % Colors hyperlinks in blue - change to black if annoying
 \title{\ttitle} % Defines the thesis title - don't touch this
 
 \begin{document}
@@ -155,7 +155,8 @@ Date:\\
 
 \abstract{\addtocontents{toc}{\vspace{1em}} % Add a gap in the Contents, for aesthetics
 
-The Thesis Abstract is written here (and usually kept to just this page). The page is kept centered vertically so can expand into the blank space above the title too\ldots
+  Crawl.js aims at the practical importance of downloading pages efficiently and at high speed. The architecture is decentralized and workers are organized in groups (regions) which makes it locality-aware. Through the event-driven, non-blocking I/O model of Node.js\footnote{http://nodejs.org} the system is resource friendly and efficient. URLs are managed in redis\footnote{http://redis.io} sets and all operations are: asynchronous, atomic and able to handle multiple URLs (batch processing). Our combination of Node.js and redis showed a promising performance and scaling behaviour during our experiments.
+
 }
 
 \clearpage % Start a new page
