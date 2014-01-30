@@ -6,7 +6,7 @@
 
 \lhead{Chapter 5. \emph{Experiments and results}} % Change X to a consecutive number; this is for the header on each page - perhaps a shortened title
 
-After discussing how crawl.js works we want to run some experiments. We decided to test crawl.js in a closed environment. Crawling the public internet requires a good supervision and the required work to do that is simply out of scope for this thesis. All experiments were done on the opennebula cluster hosted at the university of neuchatel.
+After discussing how crawl.js works we want to run some experiments. We decided to test crawl.js in a closed environment. Crawling the public internet requires a good supervision and the required work to do that is simply out of scope for this thesis. All experiments were done on the opennebula cluster hosted at the university of Neuchatel.
 \\
 First we describe our \emph{measurement} techniques and how our \emph{setup} looks like. The \emph{setup} will stay the same during all experiments but we will use different network topologies (achieved with virtual latencies) during our work. In \emph{experiment 1} we use a topology with one region (no latencies) to verify some basic properties of crawl.js (e.g. scaling). In \emph{Experiment 2 \& 3} we introduce a new topology with 2 regions and focus on the \emph{closeness} aspect of crawl.js.
 \\
@@ -26,12 +26,12 @@ This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms
 \newline
 As the name suggests it, the URL to worker assignment is done using 2 levels. The first level (e.g. hostname) determines the group and the second level (e.g. path + query part) identifies the worker within that group. The 2-level mapper introduces the notion of groups to crawl.js and adds an additional dimension to the configuration. Previously we had 1 dimension: url-blocks. Now we have 2: groups \& blocks within that group. Note that each group can be configured independently. 1 group may have 1 worker and another 3 (e.g. depending on the number of URLs a group is responsible for).
 \newline
-With groups we have now the ability to configure crawl.js in such a way that \emph{closeness} is respected. For example we can create a group \emph{region 1} responsible for crawling sites \emph{close} to that region. How different group configurations affects the total crawl performance will be shown in experiment 3.
+With groups we have now the ability to configure crawl.js in such a way that \emph{closeness} is respected. For example we can create a group \emph{region 1} responsible for crawling sites \emph{close} to that region. How different group configurations affect the total crawl performance will be shown in experiment 3.
 
 \section{Setup}
 To do our experiments we had to setup the following types of VM in the cluster:
 \begin{itemize}
-\item www - static wikipedia snapshots.
+\item www - static Wikipedia snapshots.
 \item redis - remote queues.
 \item workers - crawls pages from \emph{www} and updates remote queues in \emph{redis}.
 \end{itemize}
@@ -46,8 +46,8 @@ To setup and manage (workers) the VMs efficiently we wrote some basic bash scrip
 \label{test_setup}
 \end{figure}
 
-\subsection{www - wikipedia snapshots}
-In order to have realistic sites to crawl we decided to setup wikipedia html dumps. Unfortunately their dumper stopped back in 2008 and therefore the snapshots are pretty old. But for our use case it is good enough. Almost. Back then, the different wikipedia languages were located in different subdirectories. All on the same server. But we need links pointing to different servers to be able to add latency to some of the sites and experiment with the \emph{closeness} aspect of crawl.js. Therefore we wrote an xsl transformation script to change all language links from /de/index.html to de.wikipedia.org/index.html.
+\subsection{www - Wikipedia snapshots}
+In order to have realistic sites to crawl we decided to setup Wikipedia html dumps. Unfortunately their dumper stopped back in 2008 and therefore the snapshots are pretty old. But for our use case it is good enough. Almost. Back then, the different Wikipedia languages were located in different subdirectories. All on the same server. But we need links pointing to different servers to be able to add latency to some of the sites and experiment with the \emph{closeness} aspect of crawl.js. Therefore we wrote an xsl transformation script to change all language links from /de/index.html to de.wikipedia.org/index.html.
 
 
 Additionally we encountered a serious performance problem during our first tests. The random read performance in our VM was about 200 IOPS (tested with fio). Therefore the web server (nginx) could not deliver pages fast enough and represented the bottleneck in our setup. In order to circumvent this unwanted side effect we put our html dumps on a ramfs.
@@ -110,7 +110,7 @@ Here is an overview of the configuration we used.
 All tests started with the same seed URL (http://bn.wikipedia.org). Verifying the first property \emph{the crawl stops} was straight forward and done manually. \emph{Adding more workers improves the overall crawl performance} was verified too as shown in Figure~\ref{plot:exp_001}. The scaling behaviour actually exceeded our expectations as it was linear. We were able to add workers and observe a constant increase of the whole system performance. Doing this we also observed that the performance per worker reaches its maximum only in a system with at least 3 workers (\~260 pages/second). We tried to explain this behaviour with bandwidth limitations a single worker has (100mbit), but our assumptions turned out to be wrong and we still can't explain it. Hopefully, a system with less than 3 workers is rather uncommon and we decided to not further investigate in finding the bottleneck causing this behaviour.
 \newline
 \newline
-For the last property \emph{All pages are found} wikipedia provides a downloadable text file containing all article URLs. Using this file we were able to import the expected URLs into redis (set datastructure). Afterwards we took the difference (redis diff) between the two sets 'urls:expected' and 'urls:crawled'. Unfortunately the resulting set was not empty. It had 23'338 URLs. That number seemed us pretty huge, thats about 16\% of all articles. Did we miss that many URLs? We decided to have a closer look at some randomly picked articles to check what we actually missed. We discovered quickly that most of these 'missed' articles redirected (alias) to other articles we did crawl (13'391 redirect articles). Because articles never reference articles through an alias, crawl.js did not discover those 'redirect-articles' (as we follow references,<a> tags). This still leaves us with 9'947 (7\%) of potentially missed articles. Again we randomly picked some of the remaining articles and discovered that none of them were referenced by other articles (using grep -r). Of course we did not check for references to all remaining articles but 7\% of orphaned articles~\footnote{\url{http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Orphanage}} seemed us realistic and therefore the verification of this property good enough to proceed with our experiments.
+For the last property \emph{All pages are found} Wikipedia provides a downloadable text file containing all article URLs. Using this file we were able to import the expected URLs into redis (set datastructure). Afterwards we took the difference (redis diff) between the two sets 'urls:expected' and 'urls:crawled'. Unfortunately the resulting set was not empty. It had 23'338 URLs. That number seemed us pretty huge, thats about 16\% of all articles. Did we miss that many URLs? We decided to have a closer look at some randomly picked articles to check what we actually missed. We discovered quickly that most of these 'missed' articles redirected (alias) to other articles we did crawl (13'391 redirect articles). Because articles never reference articles through an alias, crawl.js did not discover those 'redirect-articles' (as we follow references,<a> tags). This still leaves us with 9'947 (7\%) of potentially missed articles. Again we randomly picked some of the remaining articles and discovered that none of them were referenced by other articles (using grep -r). Of course we did not check for references to all remaining articles but 7\% of orphaned articles~\footnote{\url{http://en.wikipedia.org/wiki/Wikipedia:WikiProject_Orphanage}} seemed us realistic and therefore the verification of this property good enough to proceed with our experiments.
 \newline
 \newline
 \begin{figure}
@@ -139,7 +139,7 @@ For the last property \emph{All pages are found} wikipedia provides a downloadab
 
 \section{Experiment 2}
 
-In this experiment we took the same components (4 workers) as in experiment 1 but we introduced a new network topology with 2 regions as shown in Figure~\ref{topology_exp2}. Basically we introduced two virtual regions by adding latencies between workers and wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
+In this experiment we took the same components (4 workers) as in experiment 1 but we introduced a new network topology with 2 regions as shown in Figure~\ref{topology_exp2}. Basically we introduced two virtual regions by adding latencies between workers and Wikipedia servers. The latency values used reflect the \emph{closeness} of the regions towards the Wikipedia servers. With this new topology we want to demonstrate how drastically crawl performance suffers when dealing with latencies. Especially when using a random URL to worker assignment. In experiment 3 we will reconfigure the system in order to obtain better crawl performances with the same network topology in place.
 
 \begin{figure}[h]
 \centering
@@ -234,7 +234,7 @@ As you can see adding 100ms (same goes for 150ms) of latency results in a total 
 
 \section{Experiment 3}
 
-In the previous experiment we showed that latency on sites affects the crawl performance heavily. In this experiment we want to demonstrate that crawl.js is able to deal with different latencies on different sites. We want to show that when using the same topology as in experiment 2 we are able to achieve better performances by reconfiguring crawl.js. We will keep the number of workers the same but we will re-group them differently in order to respect \emph{closeness}. Figure~\ref{topology_exp3} shows how we re-grouped the workers. 
+In the previous experiment we showed that latency on sites affect the crawl performance heavily. In this experiment we want to demonstrate that crawl.js is able to deal with different latencies on different sites. We want to show that when using the same topology as in experiment 2 we are able to achieve better performances by reconfiguring crawl.js. We will keep the number of workers the same but we will re-group them differently in order to respect \emph{closeness}. Figure~\ref{topology_exp3} shows how we re-grouped the workers. 
 
 \subsection{Configuration}
 In experiment 2 we had only one group and the URL to worker assignment was done randomly. The result was that every worker was affected by the latency. So in order to achieve a better performance we need to avoid cross-region crawls. Therefore we introduce a second group and each group will be assigned to one site only. Group 0 for bs.wikipedia.org and group 1 for bn.wikipedia.org. With this setup workers won't be affected anymore by the cross-region latencies which should result in better crawl performances. Figure~\ref{plot:exp_003} shows our measurements.

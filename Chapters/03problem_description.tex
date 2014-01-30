@@ -1,6 +1,6 @@
 % Chapter Template
 \chapter{Problem description} % Main chapter title
-Building a slow crawler that runs on one machine and downloads several pages per minute is easy. Designing and implementing a distributed and parallel web crawler presents a number of challanges. In this chapter we want to discuss those more in detail.
+Building a slow crawler that runs on one machine and downloads several pages per minute is easy. Designing and implementing a distributed and parallel web crawler presents a number of challenges. In this chapter we want to discuss those more in detail.
 
 \label{Chapter3} % Change X to a consecutive number; for referencing this chapter elsewhere, use \ref{ChapterX}
 
@@ -12,9 +12,9 @@ Today (Thursday, 09 May, 2013) the size of the world wide web is at least 14.78 
 Here is a simple calculation to demonstrate how long it takes to download the entire web if you fetch one page after the other.
 Lets assume an average page size of \textbf{320KB} \cite{webmetrics} (including resources such as images, scripts and stylesheets) and an ideal network connection of \textbf{100mbit/s}.
 
-Based on these numbers it would take \textbf{~11.7 years}. And it becomes worse when you add a realistic latency of 100msec per page which adds another \textbf{~47 years} of idletime. So, in total it takes \textbf{58.7 years}.
+Based on these numbers it would take \textbf{~11.7 years}. And it becomes worse when you add a realistic latency of 100msec per page which adds another \textbf{~47 years} of idle time. So, in total it takes \textbf{58.7 years}.
 
-As you see, if we want to download the web in a reasonable amout of time we have to \textbf{split} and \textbf{distribute} the work so that we can work in \textbf{parallel}.
+As you see, if we want to download the web in a reasonable amount of time we have to \textbf{split} and \textbf{distribute} the work so that we can work in \textbf{parallel}.
 
 \section{Parallel work}
 Lets discuss the challenges in splitting and distributing the work.
@@ -38,7 +38,7 @@ What worker should work on which work piece next? so that:
 The balancer should recognise workers taking too long to do one piece of work and be able take appropriate actions.
 
 \section{Performance}
-The reason why we \textbf{split} and \textbf{distribute} the work is performance. We want to minimalize the time to download all pages. Doing it in parallel is not everything, we need to tackle a lot more challenges. The number of optimizations one could think of is probably infinite. Here are the major challenges we want to solve.
+The reason why we \textbf{split} and \textbf{distribute} the work is performance. We want to minimize the time to download all pages. Doing it in parallel is not sufficient, we need to tackle a lot more challenges. The number of optimizations one could think of is probably infinite. Here are the major challenges we want to solve.
 \subsection{Closeness}
 \label{closeness}
 In order to optimize a particular worker, the worker should be \textbf{close} in terms of:
