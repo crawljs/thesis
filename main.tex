@@ -155,7 +155,7 @@ Date:\\
 
 \abstract{\addtocontents{toc}{\vspace{1em}} % Add a gap in the Contents, for aesthetics
 
-  Crawl.js aims at the practical importance of downloading pages efficiently and at high speed. The architecture is decentralized and workers are organized in groups (regions) which makes it locality-aware. Through the event-driven, non-blocking I/O model of Node.js\footnote{http://nodejs.org} the system is resource friendly and efficient. URLs are managed in redis\footnote{http://redis.io} sets and all operations are: asynchronous, atomic and able to handle multiple URLs (batch processing). Our combination of Node.js and redis showed a promising performance and scaling behaviour during our experiments.
+  Crawl.js aims at the practical importance of downloading pages efficiently and at high speed. The architecture is decentralized and workers are organized in groups (regions) which makes Crawl.js locality-aware. Through the event-driven, non-blocking I/O model of Node.js\footnote{http://nodejs.org} the system is resource friendly and efficient. URLs are managed in Redis\footnote{http://redis.io} sets and operations are asynchronous, atomic and able to handle multiple URLs (batch processing). The combination of Node.js and Redis shows promising performance and linear scalability.
 
 }
 

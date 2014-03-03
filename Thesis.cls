@@ -222,8 +222,8 @@
                 {UNIVERSITÉ DE NEUCHÂTEL}}
 %-------------------------------------------------                
 \department{\texorpdfstring{\href{http://www2.unine.ch/iiun/page-5100.html} % Your department's URL
-                {Department of Computer science}} % Your department's name - used in the title page and abstract
-                {Department of Computer science}}
+                {Department of Computer Science}} % Your department's name - used in the title page and abstract
+                {Department of Computer Science}}
 %-------------------------------------------------                
 \DEPARTMENT{\texorpdfstring{\href{http://www2.unine.ch/iiun/page-5100.html} % Your department's URL
                 {DEPARTMENT OF COMPUTER SCIENCE}} % Your department's name in capitals - this is not currently used anywhere in the template, cite it with \DEPTNAME if you want it
