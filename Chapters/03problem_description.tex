@@ -1,16 +1,16 @@
 % Chapter Template
 \chapter{Problem description} % Main chapter title
-Building a slow crawler that runs on one machine and downloads several pages per minute is easy. Designing and implementing a distributed and parallel web crawler presents a number of challenges. In this chapter we want to discuss those more in detail.
+Building a slow crawler that runs on one machine and downloads several pages per minute is easy. Designing and implementing a distributed and parallel web crawler presents a number of challenges. In this chapter we want to discuss them in more detail.
 
 \label{Chapter3} % Change X to a consecutive number; for referencing this chapter elsewhere, use \ref{ChapterX}
 
 \lhead{Chapter 3. \emph{Problem description}} % Change X to a consecutive number; this is for the header on each page - perhaps a shortened title
 
-\section{Size of the web}
-Today (Thursday, 09 May, 2013) the size of the world wide web is at least 14.78 billion (10\textsuperscript{9}) indexed pages.\cite{wwwsize}
+\section{On the size of the web}
+Today, the size of the world wide web is at least 14.78 billion (10\textsuperscript{9}) indexed pages.\cite{wwwsize}
 
 Here is a simple calculation to demonstrate how long it takes to download the entire web if you fetch one page after the other.
-Lets assume an average page size of \textbf{320KB} \cite{webmetrics} (including resources such as images, scripts and stylesheets) and an ideal network connection of \textbf{100mbit/s}.
+Lets assume an average page size of \textbf{320KB} \cite{webmetrics} (including resources such as images, scripts and style sheets) and an ideal network connection of \textbf{100mbit/s}.
 
 Based on these numbers it would take \textbf{~11.7 years}. And it becomes worse when you add a realistic latency of 100msec per page which adds another \textbf{~47 years} of idle time. So, in total it takes \textbf{58.7 years}.
 
@@ -21,18 +21,18 @@ Lets discuss the challenges in splitting and distributing the work.
 \subsection{Split}
 How do we split the huge amount of work equally? We need pieces of work that we can distribute to different workers. The pieces should be:
 \begin{itemize}
-\item Mutual exclusive (we dont want to download pages twice)
+\item Mutual exclusive (we do not want to download pages twice).
 \item Equally sized.
-\item Clustered in terms of \textbf{closeness}.
+\item Clustered in terms of \textbf{closeness} (By country for example).
 \end{itemize}
-Additionally we have another challenge. The total amount of work is growing and therefore we need to be able to adjust the splitting dynamically. If one piece becomes too big we need to be able to split it further.
+Additionally we have another challenge. The total amount of work is growing and therefore we need to be able to adjust the split dynamically, that is, if one piece becomes too big we need to be able to split it further.
 \subsection{Distribute}
-Once we have splitted the work we can distribute the smaller work pieces to different workers. This has to be done in such a way that every piece of work is assigned to one worker only. Additionally we want that the work load of all workers is more or less the same. This leads us to another problem we have to work on: \textbf{Load-balancing}.
-\subsection{Load-balance}
-What worker should work on which work piece next? so that:
+Once we have splitted the work we can distribute the smaller work pieces to different workers. This has to be done in such a way that every piece of work is assigned to one worker only. Additionally we want that the workload of all workers is more or less the same. This leads us to the third problem we need to investigate: \textbf{Load-balancing}.
+\subsection{Load-balancing}
+What worker should work on which piece next? so that:
 \begin{itemize}
 \item Every worker is busy.
-\item No worker is idleing.
+\item No worker is idling.
 \item The worker is working on a piece best suited for him. (\textbf{Performance})
 \end{itemize}
 The balancer should recognise workers taking too long to do one piece of work and be able take appropriate actions.
@@ -47,4 +47,4 @@ In order to optimize a particular worker, the worker should be \textbf{close} in
 \item Geo Location
 \end{itemize}
 \subsection{Decentralized}
-We don't want a \textbf{central} bottleneck unit. Every component in the system should be intelligent and able to decide what to do next on his own.
+We do not want a \textbf{central} bottleneck unit. Every component in the system should be intelligent and autonomic.
