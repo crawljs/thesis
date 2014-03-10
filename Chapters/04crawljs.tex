@@ -26,7 +26,7 @@ This ability of being able to compute an identifier for a URL \emph{independentl
   \item Equally sized - From block to block the number of URLs should roughly be the same.
 \end{itemize}
 
-In other words the mapper is responsible to \emph{split} the work. In Crawl.js the mapper is nothing more than a function implemented as a separate module. Each component that needs to be able to map an URL to an identifier just include the module. The algorithm used is rather simple and illustrated below:
+In other words the mapper is responsible to \emph{split} the work. In Crawl.js, the mapper is nothing more than a function implemented as a separate module. Each component that needs to be able to map a URL to an identifier just include the module. The algorithm used is rather simple and illustrated below:
 \begin{algorithmic}[0]
 \Function{Map}{$url$}\Comment{Map the URL to an identifier}
 \State $host \gets url.host$\Comment{Only the host part ex. www.unine.ch}
@@ -49,14 +49,14 @@ During our first test runs we accidentally hashed the whole URL. This resulted i
 The introduced mapper function here is rather simplistic but because of its important role we built Crawl.js such that this component can easily be replaced. In the following we present an alternative mapper that we used throughout our experiments in Section~\ref{Chapter5}.
 
 \subsection{2-level Mapper (Groups of workers)}
-This novel mapper introduces the \emph{closeness} aspect. Closer sites (in terms of latency) should be crawled by workers near them. 
+This novel mapper introduces the \emph{closeness} aspect. Closer sites should be crawled by workers near them (in terms of latency). 
 \newline
-As the name suggests it, the URL to worker assignment is done using 2 levels. The first level (e.g. hostname) determines the group and the second level (e.g. path + query part) identifies the worker within that group. The 2-level mapper introduces the notion of groups to Crawl.js and adds an additional dimension to the configuration. Previously we had 1 dimension: URL-blocks. Now we have 2: groups \& blocks within that group. Note that each group can be configured independently. 1 group may have 1 worker and another 3 (e.g. depending on the number of URLs a group is responsible for).
+As the name suggests it, the URL to worker assignment is done using 2 levels. The first level (e.g. hostname) determines the group and the second level (e.g. path + query part) identifies the worker within that group. The 2-level mapper introduces the notion of groups to Crawl.js which adds an additional dimension to the configuration. The number of groups and each group size can be configured independently. One group may have one worker and another three (e.g. depending on the number of URLs a group is responsible for).
 \newline
 With groups we have now the ability to configure Crawl.js in such a way that \emph{closeness} is respected. For example we can create a group \emph{region 1} responsible for crawling sites \emph{close} to that region. How different group configurations affect the total crawl performance will be shown in experiment 3.
 
 \section{Queues}
-Queues play a central role in the Crawl.js system. There are \emph{local} queues and \emph{remote} queues. Each worker keeps a local, in-memory queue during his crawl for various reasons discussed in section \ref{queues_local} and each worker \emph{consumes} URLs from a remote queue. A remote queue represents one virtual URL block (as discussed in section \ref{mapper}). But, before we start with the details we state more precisely the term queue used in Crawl.js.
+Queues play a central role in the Crawl.js system. There are \emph{local} queues and \emph{remote} queues. Each worker keeps a local in-memory queue during his crawl for various reasons discussed in section \ref{queues_local} and each worker \emph{consumes} URLs from a remote queue. A remote queue represents one virtual URL block (as discussed in section \ref{mapper}). But, before we start with the details we state more precisely the term queue used in Crawl.js.
 
 \subsection{Queue}
 First a few words about how we use the word \emph{Queue} within this document. Strictly and technically speaking it is \emph{more} than a queue. A basic queue has the following operations:
@@ -70,7 +70,7 @@ New items are enqueued at the bottom of the list and existing items are dequeued
 Therefore in Crawl.js a queue is a \emph{sorted set}. With sorted sets we can achieve whatever order we like. We can simulate a queue with it (that's why we still call it queue), use a pure random approach (set) or use custom algorithms to compute the order in the queues (re-visit policies).
 
 \subsection{Consuming \& Producing}
-The \emph{consumer} is the worker. Only one worker. So, the worker needs to know from which remote queue to consume from. This information is given as startup parameter. The parameter is not only the identifier of the queue but the identifier of the virtual URL block this worker is responsible for. We discussed the ability of every worker being able to map an URL to an id in section \ref{mapper}. With the help of this additional parameter the worker is now able to decide if responsible for a given URL (compare the ids). If, the URL is added to the \emph{local} queue. Otherwise the URL is added to the appropriate \emph{remote} queue. Doing so makes the worker also a \emph{producer}. Obviously because there are multiple workers acting the same, we have a multiple producer situation for a single remote queue. 
+The \emph{consumer} is the worker. Only one worker. Therefore, we need to assign each worker to the right remote queue which is done through a startup parameter. The parameter is not only the identifier of the queue but the identifier of the virtual URL block this worker is responsible for. We discussed the ability of every worker to be able to map an URL to an id in section \ref{mapper}. With the help of this additional parameter the worker can now decide if responsible for a given URL (compare the ids). If, the URL is added to the \emph{local} queue. Otherwise the URL is added to the appropriate \emph{remote} queue. Doing so makes the worker also a \emph{producer}. Obviously because there are multiple workers acting the same, we have a multiple producers situation for a single remote queue. 
 
 \subsection{Local Queue (in-memory)}
 \label{queues_local}
@@ -80,15 +80,15 @@ As the title describes it, from the worker's point of view it is a local and in-
   \item Additionally we do not want to fetch the same URL twice (during one crawl of one worker). Therefore the local queue is the first filter used to eliminate duplicated URLs. Because the Queue is implemented as a sorted set, checking for the existence of an URL is easy and achievable with a O(1) complexity.
 \end{itemize}
 
-One thing to note is that the state of this local queue is in memory only. This means that when the worker crashes this state is lost. So we need to find a trade-off between autonomy and fault tolerance. We want the worker to be autonomous (no inter communication) as much as possible, but on the other side we do not want to lose much information if a worker crashes. Currently this trade off is adjustable with the help of a configuration value that limits the size of the queue. Once this limit is reached, the worker does not put any new URLs in the local queue but dispatches them to the \emph{remote} one so that the local queue is emptied and the crawl finished. An additional idea would be to limit a crawl in terms of time, but this is future work.
+One thing to note is that the state of this local queue is in memory only. This means that when the worker crashes this state is lost. So we need to find a trade-off between autonomy and fault tolerance. We want the worker to be autonomous (no inter communication) as much as possible, but on the other side we do not want to lose much information if a worker crashes. Currently this trade off is adjustable with the help of a configuration value that limits the size of the queue. Once this limit is reached, the worker does not put any new URLs in the local queue but dispatches them to the \emph{remote} one so that the local queue is emptied and the crawl finished. An additional idea would be to limit a crawl in terms of time, but this is left as a future work.
 
 \subsection{Remote Queue}
 \label{queues_remote}
-As mentioned in the introduction of this section one worker is responsible for one queue but all other workers are able to fill it. The state of all remote queues represents the whole system state. URLs on the top of those queues are going to be fetched next and URLs at the bottom have just been fetched successfully. It is obvious that this state is important and needs to be persistent. 
+As mentioned in the introduction of this section, one worker is responsible for one queue but all other workers are able to fill it. The state of all remote queues represents the whole system state. URLs on the top of those queues are going to be fetched next and URLs at the bottom have just been fetched successfully. It is obvious that this state is important and needs to be persistent. 
 
 
 \subsection{Remote Queue implementation (Redis.io)}
-In Crawl.js remote queues are implemented with Redis\footnote{Redis - \url{http://www.redis.io}}. We use one sorted set for one remote queue. Luckily the sorted set from Redis gives us all the atomic operations we need. Redis uses the notion of score to sort the elements in the set. With the help of this score value we can, not only sort the elements within the queue, but also store the meta data associated to it. (ex. score > 0 := FETCHED, score < 0 := FETCH). Each element in the sorted set is a tuple <member, score> where the member is an URL in our case. How the worker uses the score together with the available commands is described below. Low (even negative) score values represent URLs that are going to be fetched next.
+In Crawl.js remote queues are implemented with Redis\footnote{Redis - \url{http://www.redis.io}}. We use one sorted set for one remote queue. Hopefully, the sorted set from Redis gives us all the atomic operations we need. Redis uses the notion of score to sort the elements in the set. With the help of this score value we can, not only sort the elements within the queue, but also store the meta data associated to it. (ex. score > 0 := FETCHED, score < 0 := FETCH). Each element in the sorted set is a tuple <member, score> where the member is an URL in our case. How the worker uses the score together with the available commands is described below. Low (even negative) score values represent URLs that are going to be fetched next.
 
 \begin{enumerate}
   \item \textbf{ZRANGEBYSCORE}\footnote{\url{http://redis.io/commands/zrangebyscore}} (single consumer) - get next URLs that need to be fetched. Note that the elements in the queue are not removed yet.
@@ -96,7 +96,7 @@ In Crawl.js remote queues are implemented with Redis\footnote{Redis - \url{http:
   \item \textbf{ZADD} (single producer) - As soon as an URL is fetched successfully we set the score to the current time stamp. This makes the entry move to the bottom of the queue.
 \end{enumerate}
 
-This is maybe not the best approach of how to prioritize URLs within the remote queues, but it was simple to implement and allowed us to run first tests. The important thing to note here is that we have set a base with sorted sets that allows us to easily try out new approaches. As an example we could introduce an independent component in the system that takes care of computing the order of our queues based on some algorithms. (ex. Page rank).
+This is maybe not the best approach of how to prioritize URLs within the remote queues, but it was simple to implement and allowed us to run the first tests. The important thing to note here is that we have set a base with sorted sets that allows us to easily try out new approaches. As an example we could introduce an independent component in the system that takes care of computing the order of our queues based on some algorithms. (ex. Page rank).
 
 \section{Stores}
 Besides \emph{Queues} there is another important component in the system. \emph{Stores}. While queues persist the system state, stores persist the downloaded content (html, css, js, ..). The worker is able to identify his store using the \emph{mapper} module.
@@ -121,7 +121,7 @@ While Crawl.js is the whole system composed of different components (queue, stor
 In this section we will talk about the software architecture and discuss some implementation details.
 
 \subsection{Node.js}
-A goal in the implementation of Crawl.js was native support for non blocking I/O because crawling web pages involves a lot of I/O. We do not want to block while waiting for a response to be completely available (headers, body). We want to fire requests and be notified (called back) when there is some data available. And while we are idling we have time to do other things (parsing). In Node.js everything is done through events (callbacks). An event is a function that gets executed with a defined context. It starts with the initial start script and ends when there are no more callbacks to be executed. This event model fits very well and allows us to implement the crawler in a elegant way. We did not need to struggle with multiple threads and possible dead locks to achieve concurrency. Below are some example of events we will encouter throughout the code.
+A goal in the implementation of Crawl.js was native support for non blocking I/O because crawling web pages involves a lot of I/O. We do not want to block while waiting for a response to be completely available (headers, body). We want to fire requests and be notified (called back) when there is some data available. And while we are idling we have time to do other things (parsing). In Node.js everything is done through events (callbacks). An event is a function that gets executed with a defined context. It starts with the initial start script and ends when there are no more callbacks to be executed. This event model fits very well and allows us to implement the crawler in an elegant way. We did not need to struggle with multiple threads and possible dead locks to achieve concurrency. Below, are some example of events we will encouter throughout the code.
 
 \begin{itemize}
   \item on 'url': fetch page
@@ -191,7 +191,7 @@ function init(block) {
 }
 \end{lstlisting}
 
-First, we populate (Line 3) the virtual URL block we are responsible to the whole application and establish the event flow. After that we peek (without removing them) some URLs from the remote queue and as soon as we get some URLs back the 'url' event is fired which causes the crawl to start. Also later during the crawl, whenever a new URL is found (ex. parsing) it is the same event that gets fired over and over. So let's examine the function \emph{crawl} that gets triggered by the 'url' event (Line 4).
+First, we populate (Line 3) the virtual URL block we are responsible to the whole application and establish the event flow. After that, we peek (without removing them) some URLs from the remote queue and as soon as we get some URLs back the 'url' event is fired which causes the crawl to start. Also later during the crawl, whenever a new URL is found (ex. parsing) it is the same event that gets fired over and over. So let's examine the function \emph{crawl} that gets triggered by the 'url' event (Line 4).
 
 \begin{lstlisting}[language=JavaScript]
 function crawl() {
@@ -228,7 +228,7 @@ function crawl() {
 }
 \end{lstlisting}
 
-To be able to crawl a page we need the \emph{Fetcher} in the first place. So, if busy we do nothing. Busy means that the fetcher has reached the configured value (config.json) of concurrent connections.
+To be able to crawl a page we need the \emph{Fetcher} in the first place. If the Fetcher is busy, nothing happens. Busy means that the fetcher has reached the configured value (config.json) of concurrent connections.
 Let's assume the fetcher is not busy and we have an URL in our queue. In that case, we are going to crawl our first page. The URL is dequeued and passed to the fetcher (Line 24). Together with the URL we pass our callback function to continue the event flow. This is a typical example of the asynchronous programming style in Node.js. The passed function (callback) is called as soon as the fetcher is done. That means we return immediately from the \emph{crawl} function and while the fetcher establishes the connection to our URL and begins to download the content we do not waste CPU resources. 
 
 Let's take a closer look to the passed callback function in Line 24. There is one argument: \emph{err}. It is a convention in Node.js that the first argument of an asynchronous callback function is always the error, even if there is none. We will encounter this programming style through out the code but now let's focus on what gets done when our callback is executed. In case of an error we log it and for debugging reasons we print out our local queue. But the most important thing happens on Line 29. Here the event loop of Node.js is presented to us as a language construct. It looks like a recursive call of \emph{crawl} but in fact we tell the event loop (behind the scenes, VM) to include the callback \emph{crawl} in his execution loop. Doing so makes sure that our worker never terminates.
@@ -253,7 +253,7 @@ Fetcher.get = function (url, cb) {
 };
 \end{lstlisting}
 
-This function assigns the job of getting the URL to an instance [Line 6]. As you can see there are multiple instances and the selection is done in a circular way (round-robin). Actually this is how we achieve multiple concurrent connections with a single thread. Because assigning one of the instances is done asynchronously (providing a callback at Line 6) we can immediately return out of the function. The assigned instance establishes the connection (discussed later) which involves a lot of waiting and because in Node.js nothing blocks during this time, \emph{get} can be executed again. Once all instances are assigned we end up in a busy fetcher. In this situation we have reached our maximum number of concurrent connections which is equal to the number of instances (configurable in config.json).
+This function assigns the job of getting the URL to an instance [Line 6]. As you can see there are multiple instances and the selection is done in a circular way (round-robin). Actually this is how we achieve multiple concurrent connections with a single thread. Because assigning one of the instances is done asynchronously (providing a callback at Line 6) we can immediately return from the function. The assigned instance establishes the connection (discussed later) which involves a lot of waiting and because in Node.js nothing blocks during this time, \emph{get} can be executed again. Once all instances are assigned we end up in a busy fetcher. In this situation we have reached our maximum number of concurrent connections which is equal to the number of instances (configurable in config.json).
 
 Because our class function \emph{get} does only assign jobs to fetcher instances, let's have a look at a code snippet of an instance.
 
@@ -330,7 +330,7 @@ Dispatcher.prototype.dispatch = function(urlObj) {
 };
 \end{lstlisting}
 
-If the identifier of the URL (Mapper [\ref{mapper}]) matches the virtual URL \emph{block} we are responsible for we enqueue the URL to our local queue. Additionally, we enqueue it remotely in order to keep the local and remote queues in sync. We do this to survive worker crashes. If happens we can restart by synchronizing our local queue with the remote one, then continue where we left. Additionally, we stop to enqueue to the local queue as soon as it is full (limit configurable in config.json). This configurable limit allows us to tweak the trade-off between fault tolerance and autonomy as mentioned in section \ref{queues_local}. Setting a low value (ex. 100) makes the worker end after a short period of time and reask the remote queue for new URLs (less autonomous). Respectively, a large value makes the crawl more autonomous but less fault-tolerant.
+If the identifier of the URL (Mapper [\ref{mapper}]) matches the virtual URL \emph{block} we are responsible for we enqueue the URL to our local queue. Additionally, we enqueue it remotely in order to keep the local and remote queues in sync. We do this to survive worker crashes. If one occurs we can restart by synchronizing our local queue with the remote one, then continue where we left. Additionally, we stop to enqueue to the local queue as soon as it is full (limit configurable in config.json). This configurable limit allows us to tweak the trade-off between fault tolerance and autonomy as mentioned in section \ref{queues_local}. Setting a low value (ex. 100) makes the worker end after a short period of time and reask the remote queue for new URLs (less autonomous). Respectively, a large value makes the crawl more autonomous but less fault-tolerant.
 
 \subsection{Seen (seen.js)}
 In the last snippet an important module was not discussed. The seen module. It is pretty simple in terms of the functions it provides:
