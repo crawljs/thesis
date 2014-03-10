@@ -7,7 +7,7 @@ In this chapter we describe how crawl.js splits and distributes the work in deta
 \section{System overview}
 Crawl.js is a decentralized system. Each \emph{worker} in the system is standalone and autonomous and does not depend on any other worker. The only thing a worker needs is a connection to the \emph{Queues} and to the \emph{Stores}. Figure~\ref{system_overview} gives an overview of the main components in our system.
 
-In order to explore our architecture, let us follow the path of an URL in the system.
+In order to explore our architecture, we follow the path of an URL in the system.
 The first thing a worker needs to do is get some URLs (Step 1) from a remote queue (Note that the worker knows by his own which Queue to ask). Steps 2 and 3 involves fetching, parsing and storing the content given by the URL. Thanks to the asynchronous nature (Streaming) of Crawl.js the parsing (Step 3) can happen before the fetching (Step 2) is completed. Even storing the content (Step 3) is done while fetching. Whenever a new URL is extracted in the parsing step it is added to the \emph{Queue}. The queue then decides what to do (Steps \emph{4a},\emph{4b}). Either it is kept in the local (in-memory) queue or dispatched to a remote one (batch processing).
 
 \begin{figure}[h]
@@ -171,7 +171,7 @@ As mentioned above Crawl.js is written in JavaScript. In this section we will st
 }
 
 \subsection{Application (crawl.js)}
-Let's start with the entry point. To run a worker we need to provide one argument. The ID of the virtual URL block (url-block). A worker needs to know for which block he is responsible for. The range of the available url-blocks is configurable in \emph{config.json}.
+We start with the entry point. To run a worker we need to provide one argument. The ID of the virtual URL block (url-block). A worker needs to know for which block he is responsible for. The range of the available url-blocks is configurable in \emph{config.json}.
 
 \begin{lstlisting}[language=sh]
 $ node crawl.js <url-block>
@@ -191,7 +191,7 @@ function init(block) {
 }
 \end{lstlisting}
 
-First, we populate (Line 3) the virtual URL block we are responsible to the whole application and establish the event flow. After that, we peek (without removing them) some URLs from the remote queue and as soon as we get some URLs back the 'url' event is fired which causes the crawl to start. Also later during the crawl, whenever a new URL is found (ex. parsing) it is the same event that gets fired over and over. So let's examine the function \emph{crawl} that gets triggered by the 'url' event (Line 4).
+First, we populate (Line 3) the virtual URL block we are responsible to the whole application and establish the event flow. After that, we peek (without removing them) some URLs from the remote queue and as soon as we get some URLs back the 'url' event is fired which causes the crawl to start. Also later during the crawl, whenever a new URL is found (ex. parsing) it is the same event that gets fired over and over. So in the following we examine the function \emph{crawl} that gets triggered by the 'url' event (Line 4).
 
 \begin{lstlisting}[language=JavaScript]
 function crawl() {
@@ -229,13 +229,12 @@ function crawl() {
 \end{lstlisting}
 
 To be able to crawl a page we need the \emph{Fetcher} in the first place. If the Fetcher is busy, nothing happens. Busy means that the fetcher has reached the configured value (config.json) of concurrent connections.
-Let's assume the fetcher is not busy and we have an URL in our queue. In that case, we are going to crawl our first page. The URL is dequeued and passed to the fetcher (Line 24). Together with the URL we pass our callback function to continue the event flow. This is a typical example of the asynchronous programming style in Node.js. The passed function (callback) is called as soon as the fetcher is done. That means we return immediately from the \emph{crawl} function and while the fetcher establishes the connection to our URL and begins to download the content we do not waste CPU resources. 
+Assuming that the fetcher is not busy and we have an URL in our queue. In that case, we are going to crawl our first page. The URL is dequeued and passed to the fetcher (Line 24). Together with the URL we pass our callback function to continue the event flow. This is a typical example of the asynchronous programming style in Node.js. The passed function (callback) is called as soon as the fetcher is done. That means we return immediately from the \emph{crawl} function and while the fetcher establishes the connection to our URL and begins to download the content we do not waste CPU resources. 
 
-Let's take a closer look to the passed callback function in Line 24. There is one argument: \emph{err}. It is a convention in Node.js that the first argument of an asynchronous callback function is always the error, even if there is none. We will encounter this programming style through out the code but now let's focus on what gets done when our callback is executed. In case of an error we log it and for debugging reasons we print out our local queue. But the most important thing happens on Line 29. Here the event loop of Node.js is presented to us as a language construct. It looks like a recursive call of \emph{crawl} but in fact we tell the event loop (behind the scenes, VM) to include the callback \emph{crawl} in his execution loop. Doing so makes sure that our worker never terminates.
+Taking a closer look to the passed callback function in Line 24. There is one argument: \emph{err}. It is a convention in Node.js that the first argument of an asynchronous callback function is always the error, even if there is none. We will encounter this programming style through out the code but now we focus on what gets done when our callback is executed. In case of an error we log it and for debugging reasons we print out our local queue. But the most important thing happens on Line 29. Here the event loop of Node.js is presented to us as a language construct. It looks like a recursive call of \emph{crawl} but in fact we tell the event loop (behind the scenes, VM) to include the callback \emph{crawl} in his execution loop. Doing so makes sure that our worker never terminates.
 
 \subsection{Fetcher (fetcher.js)}
-Next thing to look at is the fetcher. We mentioned before that we are able to process multiple concurrent connections without multiple threads. So how is this actually achieved and how does the event flow continue after we get some data back.
-Let's start with the most important function \emph{get}. Note that this is a class function.
+Next thing to look at is the fetcher. We mentioned before that we are able to process multiple concurrent connections without multiple threads. So how is this actually achieved and how does the event flow continue after we get some data back. First, we start with the most important class function \emph{get}.
 
 \begin{lstlisting}[language=JavaScript]
 Fetcher.get = function (url, cb) {
@@ -253,9 +252,9 @@ Fetcher.get = function (url, cb) {
 };
 \end{lstlisting}
 
-This function assigns the job of getting the URL to an instance [Line 6]. As you can see there are multiple instances and the selection is done in a circular way (round-robin). Actually this is how we achieve multiple concurrent connections with a single thread. Because assigning one of the instances is done asynchronously (providing a callback at Line 6) we can immediately return from the function. The assigned instance establishes the connection (discussed later) which involves a lot of waiting and because in Node.js nothing blocks during this time, \emph{get} can be executed again. Once all instances are assigned we end up in a busy fetcher. In this situation we have reached our maximum number of concurrent connections which is equal to the number of instances (configurable in config.json).
+This function assigns the job of getting the URL to an instance [Line 6]. There are multiple instances and the selection is done in a circular way (round-robin). Actually, this is how multiple concurrent connections are achieved with a single thread. Because assigning one of the instances is done asynchronously (providing a callback at Line 6) we can immediately return from the function. The assigned instance establishes the connection (discussed later) which involves a lot of waiting and because in Node.js nothing blocks during this time, \emph{get} can be executed again. Once all instances are assigned we end up in a busy fetcher. In this situation we have reached our maximum number of concurrent connections which is equal to the number of instances (configurable in config.json).
 
-Because our class function \emph{get} does only assign jobs to fetcher instances, let's have a look at a code snippet of an instance.
+Because the class function \emph{get} does only assign jobs to fetcher instances, the code snippet of an instance is shown in the following.
 
 \begin{lstlisting}[language=JavaScript]
 Fetcher.prototype.get = function (url, cb){
@@ -279,15 +278,13 @@ Fetcher.prototype.get = function (url, cb){
 
 We intentionally left out the details of setting up the request (timeout, max. redirects, ..) because we want to focus on those lines. It is where the event flow continues. That is to say we \emph{pipe} our Readable stream \footnote{\url{http://nodejs.org/api/stream.html}}, the request, into our \emph{extractor}. The concept of a pipeline is nothing new and a very powerful tool in the Unix world. "A set of processes chained by their standard streams, so that the output of each process (stdout) feeds directly as input (stdin) to the next one"\cite{wiki:pipeline_unix}. Our first element in the pipe (the request) feeds the extractor with multiple \emph{data} events. The fact that we can emit those events as soon as we receive them from the network (chunks) is very handy because the extractor can start extracting links while we are waiting for more \emph{data}. This event based IO (asynchronous) is what makes Node.js performing so good while remaining relatively easy to use.
 
-Let's have a look at the consumer.
-
 \subsection{Extractor (extractor.js)}
 This component is responsible for extracting new URLs out of the downloaded document. The newly found URLs are passed to the \emph{dispatcher} whose goal is to filter out URLs based on various rules. As we mentioned above we pipe \emph{data} events into the extractor, so obviously the extractor has to be a writable stream\footnote{\url{http://nodejs.org/api/stream.html}}. Additionally we implemented the extractor in such a way that the actual work of extracting the URLs is done by an engine. Currently there are two implementations available:
 \begin{itemize}
   \item Regex - Extractor engine based on regular expressions
   \item Parser - Extractor engine based on a SAX like parser
 \end{itemize}
-Additional engines can be easily added and the one to use is configured through config.json. Let's have a look at the consumer side of our pipe, the function \emph{\_write} a writable stream must implement.
+Additional engines can be easily added and the one to use is configured through config.json. The consumer side of our pipe, the function \emph{\_write} a writable stream must implement, is illustraded below.
 
 \begin{lstlisting}[language=JavaScript]
 Parser.prototype._write = function(chunk, enc, cb) {
@@ -296,7 +293,7 @@ Parser.prototype._write = function(chunk, enc, cb) {
 };
 \end{lstlisting}
 
-It does nothing but forward the data to the parser and signal (Line 3) the first element in the pipe (the request) that we successfully handled the data. During the parsing we call the function \emph{Extractor.prototype.found(urlObj)} whenever we find an URL we are interested in (ex. <a> tags). Below, its very simple implementation is depicted.
+The function does nothing but forward the data to the parser and signal (Line 3) the first element in the pipe (the request) that we successfully handled the data. During the parsing we call the function \emph{Extractor.prototype.found(urlObj)} whenever we find an URL we are interested in (ex. <a> tags). Below, its very simple implementation is depicted.
 
 \begin{lstlisting}[language=JavaScript]
 Extractor.prototype.found = function (urlObj) {
@@ -349,7 +346,7 @@ We start the crawl by asking the \emph{remote} queue for URLs and we end it when
   \item Memory - volatile implementation using an array
   \item Redis - implemented using a Redis server as backend
 \end{itemize}
-Which queue engine to use is configurable in \emph{config.json}. This setup (using engines) allows us to add new queue implementations easily. As an example let's consider the following idea for a remote queue using redis: 2 sets, one for newly found URLs, one for URLs we have successfully downloaded. We could easily implement:
+Which queue engine to use is configurable in \emph{config.json}. This setup (using engines) allows us to add new queue implementations easily. As an example consider the following idea for a remote queue using redis: 2 sets, one for newly found URLs, one for URLs we have successfully downloaded. We could easily implement:
 \begin{itemize}
   \item enqueue - add to the set of new URLs (redis sadd\footnote{\url{http://redis.io/commands\#set}})
   \item dequeue - add to the set of downloaded URLs (redis sadd)
